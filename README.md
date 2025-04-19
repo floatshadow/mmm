@@ -3,6 +3,11 @@
 ## References
 
 Bidirectional Type Inference:
+  - [Bidirectional Typing Rules: A Tutorial](https://davidchristiansen.dk/tutorials/bidirectional.pdf), Christiansen.
+  - [Checking Dependent Types with Normalization by Evaluation: A Tutorial (Haskell Version)](https://davidchristiansen.dk/tutorials/implementing-types-hs.pdf), Christiansen.
+  - [Elaboration with first-class implicit function types](https://dl.acm.org/doi/abs/10.1145/3408983), Kovács.
+  - [Towards a practical programming language based on dependent type theory](https://www.cse.chalmers.se/~ulfn/papers/thesis.pdf), Norell.
+  - [Bidirectional Elaboration of Dependently Typed Programs](https://dl.acm.org/doi/10.1145/2643135.2643153), Ferreira and Pientka.
   - [Local Type Inference](https://www.cis.upenn.edu/~bcpierce/papers/lti-toplas.pdf), Pierce.
   - [Sound and Complete Bidirectional Typechecking for Higher-Rank Polymorphism with Existentials and Indexed Types](https://www.cl.cam.ac.uk/~nk480/gadt.pdf), Dunfield et al.
   - [A quick look at impredicativity](https://dl.acm.org/doi/10.1145/3408971), Serrano et al.
