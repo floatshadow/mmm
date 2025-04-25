@@ -1,0 +1,14 @@
+{
+    "import": [
+      {
+        "path": "floatshadow/rowmltt",
+        "alias": "types"
+      }
+    ],
+    "test-import": [
+      {
+        "path": "floatshadow/rowmltt",
+        "alias": "types"
+      }
+    ],
+}
