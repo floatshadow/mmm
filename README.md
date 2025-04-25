@@ -1,5 +1,12 @@
 # Row-MLTT
 
+## Todo list
+
+- [x] untyped NbE
+- [ ] typed NbE for eta-equality
+- [ ] builtin identity type
+- [ ] row polymorphism 
+
 ## References
 
 Bidirectional Type Inference:
@@ -22,3 +29,7 @@ Dependent Pattern Matching:
   - [Elaborating dependent (co)pattern matching](https://dl.acm.org/doi/10.1145/3236770), Cockx and Abel.
   - [Pattern matching without K](https://dl.acm.org/doi/10.1145/2628136.2628139), Cockx et al.
   - [A simpler encoding of indexed types](https://dl.acm.org/doi/10.1145/3471875.3472991), Zhang.
+
+Codebases:
+  - [minimal MLTT implementation step-by-step](https://gist.github.com/Guest0x0/e94d30077519ff9c64d6317035833461), Guest0x0.
+  - [elaboration-zoon](https://github.com/AndrasKovacs/elaboration-zoo), Kovács.
