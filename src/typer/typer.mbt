@@ -1,9 +1,13 @@
+///|
 typealias Syntax = @types.Syntax
 
+///|
 typealias TypeVal = Value
+
 ///|
 typealias VEnv = @immut/hashmap.T[String, Value]
 
+///|
 typealias NameMap = @immut/hashmap.T[String, String]
 
 ///|
@@ -26,31 +30,34 @@ pub enum Value {
   VLam((Value) -> Value!Failure)
 } derive(Show)
 
+///|
 pub enum Neutral {
   NeVar(String)
   NeApp(Neutral, Value)
 } derive(Show)
 
-
 ///|
 pub fn eval(env : VEnv, expr : Syntax) -> Value!Failure {
   match expr {
-    Var(x) => match env.find(x) {
-      Some(v) => v
-      None => fail!("does not find \{x} in env when evaluation!")
-    }
+    Var(x) =>
+      match env.find(x) {
+        Some(v) => v
+        None => fail!("does not find \{x} in env when evaluation!")
+      }
     Set(i) => VSet(i)
     Pi(param_name, param_ty, return_ty) => {
       let param_ty_value = eval!(env, param_ty)
-      fn return_ty_value(param_value) -> Value!Failure{
+      fn return_ty_value(param_value) -> Value!Failure {
         eval!(env.add(param_name, param_value), return_ty)
       }
+
       VPi(param_ty_value, return_ty_value)
     }
     Lam(param_name, body) => {
-      fn body_value(param_value) -> Value!Failure{
+      fn body_value(param_value) -> Value!Failure {
         eval!(env.add(param_name, param_value), body)
       }
+
       VLam(body_value)
     }
     App(func, arg) =>
@@ -68,6 +75,7 @@ pub fn eval(env : VEnv, expr : Syntax) -> Value!Failure {
 
 // Reading back value to expressions.
 // Generate fresh name for normalization given used names.
+///|
 fn fresh_name(names : NameList) -> String {
   loop 0 {
     i => {
@@ -81,6 +89,7 @@ fn fresh_name(names : NameList) -> String {
   }
 }
 
+///|
 pub fn readback(value : Value, names : NameList) -> Syntax!Failure {
   match value {
     VNe(NeVar(x)) => Var(x)
@@ -105,17 +114,14 @@ pub fn readback(value : Value, names : NameList) -> Syntax!Failure {
       // to trigger the normalization of body `t`
       let name = fresh_name(names)
       // Wrap the body with lambda abstraction.
-      Lam(
-        name,
-        readback!(body_func!(VNe(NeVar(name))), names.add(name)),
-      )
+      Lam(name, readback!(body_func!(VNe(NeVar(name))), names.add(name)))
     }
   }
 }
 
 ///|
 fn normalize(env : VEnv, expr : Syntax) -> Syntax!Failure {
-  let env_names = [];
+  let env_names = []
   for nval in env {
     let (name, _) = nval
     env_names.push(name)
@@ -128,13 +134,12 @@ fn normalize(env : VEnv, expr : Syntax) -> Syntax!Failure {
 fn types_equiv(
   value1 : TypeVal,
   value2 : TypeVal,
-  names: NameList,
+  names : NameList
 ) -> Bool!Failure {
   let expr1 = readback!(value1, names)
   let expr2 = readback!(value2, names)
   expr1 == expr2
 }
-
 
 ///|
 pub struct TyCtx {
@@ -168,6 +173,7 @@ pub fn TyCtx::add_neutral_var(
   }
 }
 
+///|
 pub fn TyCtx::add_var(
   self : TyCtx,
   name : String,
@@ -201,37 +207,33 @@ pub fn TyCtx::add_var(
 // ------------------------ (T-Conv)
 // Γ |- e <= B
 
-fn check_expr_is_type(
-  ctx : TyCtx,
-  expr : Syntax
-) -> Int!Failure {
+///|
+fn check_expr_is_type(ctx : TyCtx, expr : Syntax) -> Int!Failure {
   match infer!(ctx, expr) {
     VSet(i) => i
     _ => fail!("\{expr} is not a type universe")
   }
 }
 
-pub fn check(
-  ctx : TyCtx,
-  expr : Syntax,
-  typ : Value
-) -> Unit!Failure {
+///|
+pub fn check(ctx : TyCtx, expr : Syntax, typ : Value) -> Unit!Failure {
   // println("check \{expr} <= \{typ}")
   match expr {
     // A ~> (x : B) -> C[x]   Γ, x : B |- e : C[x] ~ t
     // ------------------------------------------
     // Γ |- λx. e <= A ~ λx. t
-    Lam(param_name, body) => {
+    Lam(param_name, body) =>
       match typ {
         VPi(expected_param_ty_value, expected_return_ty_func) => {
           let neutral_param_value = VNe(NeVar(param_name))
-          let ctx2 = ctx.add_var(param_name, neutral_param_value, expected_param_ty_value)
+          let ctx2 = ctx.add_var(
+            param_name, neutral_param_value, expected_param_ty_value,
+          )
           let expected_return_ty = expected_return_ty_func!(neutral_param_value)
           check!(ctx2, body, expected_return_ty)
         }
         _ => fail!("\{typ} is not a dependent function type")
       }
-    }
     Let((x, x_typ), e1, e2) => {
       let _ = check_expr_is_type!(ctx, x_typ)
       let x_typ_value = eval!(ctx.values, x_typ)
@@ -253,20 +255,18 @@ pub fn check(
   }
 }
 
-
-pub fn infer(
-  ctx : TyCtx,
-  expr : Syntax,
-) -> Value!Failure {
+///|
+pub fn infer(ctx : TyCtx, expr : Syntax) -> Value!Failure {
   // println("infer \{expr}")
   let typ_val = match expr {
     // (x : A) ∈ Γ
     // ------------
     // Γ |- x => A
-    Var(x) => match ctx.typs.find(x) {
-      Some(typ) => typ
-      None => fail!("does not find \{x} in env when inference!")
-    }
+    Var(x) =>
+      match ctx.typs.find(x) {
+        Some(typ) => typ
+        None => fail!("does not find \{x} in env when inference!")
+      }
     // -------------------------
     // Γ |- Set i => Set (i + 1)
     Set(i) => VSet(i + 1)
@@ -313,20 +313,18 @@ pub fn infer(
   typ_val
 }
 
-
-
+///|
 pub fn alpha_equiv(maps : NameMap, expr1 : Syntax, expr2 : Syntax) -> Bool {
   match (expr1, expr2) {
     (Var(name1), Var(name2)) =>
-      match maps.find(name1) {
+      match maps.get(name1) {
         Some(n) => n == name2
         None => name1 == name2
       }
     (Set(u1), Set(u2)) => u1 == u2
     (Pi(n1, p1, r1), Pi(n2, p2, r2)) =>
       alpha_equiv(maps, p1, p2) && alpha_equiv(maps.add(n1, n2), r1, r2)
-    (Lam(n1, b1), Lam(n2, b2)) =>
-      alpha_equiv(maps.add(n1, n2), b1, b2)
+    (Lam(n1, b1), Lam(n2, b2)) => alpha_equiv(maps.add(n1, n2), b1, b2)
     (App(f1, a1), App(f2, a2)) =>
       alpha_equiv(maps, f1, f2) && alpha_equiv(maps, a1, a2)
     _ => false

@@ -1,4 +1,7 @@
+///|
 typealias Syntax = @types.Syntax
+
+///|
 typealias Type = @types.Type
 
 ///|
@@ -20,7 +23,6 @@ fn app(f : String, args : Array[Syntax]) -> Syntax {
 fn appE(f : Syntax, args : Array[Syntax]) -> Syntax {
   args.iter().fold(init=f, fn(f, a) { App(f, a) })
 }
-
 
 ///|
 let predef : Array[(String, Type)] = [
@@ -60,10 +62,7 @@ let predef : Array[(String, Type)] = [
   ),
   (
     "eq",
-    pi(
-      ("A", Set(0)),
-      pi(("lhs", Var("A")), pi(("rhs", Var("A")), Set(0))),
-    ),
+    pi(("A", Set(0)), pi(("lhs", Var("A")), pi(("rhs", Var("A")), Set(0)))),
   ),
   (
     "refl",
@@ -74,17 +73,10 @@ let predef : Array[(String, Type)] = [
   ),
 ]
 
-
-
-
-
 ///|
 fn check_expr_has_type(typ : Type, expr : Syntax) -> Syntax {
   Let(("checked", typ), expr, Var("checked"))
 }
-
-
-
 
 ///|
 fn test_infer_nbe(expr : Syntax) -> Syntax!Failure {
@@ -101,10 +93,7 @@ test "boolean and" {
   // λ x. λ y. if x y ff
   let ex1 = lam(
     "x",
-    lam(
-      "y",
-      app("if", [Var("Bool"), Var("x"), Var("y"), Var("ff")]),
-    ),
+    lam("y", app("if", [Var("Bool"), Var("x"), Var("y"), Var("ff")])),
   )
   let typ = pi(("x", Var("Bool")), pi(("y", Var("Bool")), Var("Bool")))
   // infer with type annotation
@@ -115,8 +104,7 @@ test "boolean and" {
 ///|
 test "function application" {
   // {A : Set} {B : Π (x : A). Set} λ (f : Π (x : A). B(x)). λ (a : A). f a
-  let ex2 = lam("A", lam("B", lam("f", lam("a", 
-    app("f", [Var("a")])))))
+  let ex2 = lam("A", lam("B", lam("f", lam("a", app("f", [Var("a")])))))
   let typ = pi(
     ("A", Set(0)),
     pi(
@@ -152,19 +140,17 @@ test "expression equality" {
   assert_true!(alpha_equiv(@immut/hashmap.new(), elab, typ))
 }
 
-
 ///|
 test "function equality" {
 
   // {A : Set} Π (a : A). A
-  let eqA  = pi(("a", Var("A")), Var("A"))
+  let eqA = pi(("a", Var("A")), Var("A"))
   // {A : Set} |- λ (x : A). x : Π (a : A). A
   let idA = lam("x", Var("x"))
   let idA_checked : Syntax = Let(("idA", eqA), idA, Var("idA"))
 
   // {A : Set} {B : Π (x : A). Set} λ (f : Π (x : A). B(x)). λ (a : A). f a
-  let ex2 = lam("A", lam("B", lam("f", lam("a", 
-    app("f", [Var("a")])))))
+  let ex2 = lam("A", lam("B", lam("f", lam("a", app("f", [Var("a")])))))
   let ex2_typ = pi(
     ("A", Set(0)),
     pi(
@@ -176,7 +162,6 @@ test "function equality" {
     ),
   )
   let ex2_checked : Syntax = Let(("ex2", ex2_typ), ex2, Var("ex2"))
-
   let ex4 : Syntax = lam(
     "A",
     check_expr_has_type(
@@ -189,11 +174,7 @@ test "function equality" {
       app("refl", [eqA, idA_checked]),
     ),
   )
-
-  let typ = pi(
-    ("A", Set(0)),
-    app("eq", [eqA, idA, lam("a", Var("a"))]),
-  )
+  let typ = pi(("A", Set(0)), app("eq", [eqA, idA, lam("a", Var("a"))]))
   let elab = test_infer_nbe!(Let(("reflidA", typ), ex4, Var("reflidA")))
   assert_true!(alpha_equiv(@immut/hashmap.new(), elab, typ))
 }

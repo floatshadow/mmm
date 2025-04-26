@@ -9,4 +9,5 @@ pub(all) enum Syntax {
   // LetRec((String, Syntax), Syntax, Syntax) // let rec f : (x1 : A1) -> (x2 : A2) -> .. (xn : An) -> B = t1 in t2
 } derive(Show, Eq)
 
+///|
 pub typealias Type = Syntax
