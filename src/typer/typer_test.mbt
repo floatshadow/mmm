@@ -83,9 +83,9 @@ fn test_infer_nbe(expr : Syntax) -> Syntax!Failure {
   let mut env = TyCtx::empty()
   for ntyp in predef {
     let (name, typ) = ntyp
-    env = env.add_neutral_var(name, eval!(env.values, typ))
+    env = env.add_binding_var(name, eval!(env.values, typ))
   }
-  readback!(infer!(env, expr), env.names)
+  readback_type!(infer!(env, expr), env.names)
 }
 
 ///|
@@ -142,7 +142,6 @@ test "expression equality" {
 
 ///|
 test "function equality" {
-
   // {A : Set} Π (a : A). A
   let eqA = pi(("a", Var("A")), Var("A"))
   // {A : Set} |- λ (x : A). x : Π (a : A). A
@@ -165,7 +164,7 @@ test "function equality" {
   let ex4 : Syntax = lam(
     "A",
     check_expr_has_type(
-      // {A : Set} |- refl {Π (a : A). A} idA : λ (x : A). x = (λ (a : A). A) (λ (x : A). x)
+      // {A : Set} |- refl {Π (a : A). A} idA : λ (x : A). x = (λ (a : A). (λ (x : A). x) a)
       app("eq", [
         eqA,
         idA_checked,

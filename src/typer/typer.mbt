@@ -2,6 +2,9 @@
 typealias Syntax = @types.Syntax
 
 ///|
+typealias Type = @types.Type
+
+///|
 typealias TypeVal = Value
 
 ///|
@@ -23,24 +26,29 @@ typealias NameList = @immut/list.T[String]
 //  - Admit free variables as value would ban further evaluations.
 //    f arg1 arg2 ... ->
 ///|
+pub enum Neutral {
+  NeVar(String)
+  NeApp(Neutral, Normal)
+} derive(Show)
+
+///|
 pub enum Value {
-  VNe(Neutral)
+  VNe(TypeVal, Neutral) // Type for embedding expression into normal form
   VSet(Int)
   VPi(Value, (Value) -> Value!Failure) // HOAS
   VLam((Value) -> Value!Failure)
 } derive(Show)
 
 ///|
-pub enum Neutral {
-  NeVar(String)
-  NeApp(Neutral, Value)
+pub enum Normal {
+  Nf(TypeVal, Value)
 } derive(Show)
 
 ///|
 pub fn eval(env : VEnv, expr : Syntax) -> Value!Failure {
   match expr {
     Var(x) =>
-      match env.find(x) {
+      match env.get(x) {
         Some(v) => v
         None => fail!("does not find \{x} in env when evaluation!")
       }
@@ -60,12 +68,10 @@ pub fn eval(env : VEnv, expr : Syntax) -> Value!Failure {
 
       VLam(body_value)
     }
-    App(func, arg) =>
-      match eval!(env, func) {
-        VLam(f) => f!(eval!(env, arg))
-        VNe(ne) => VNe(NeApp(ne, eval!(env, arg)))
-        fval => fail!("\{fval} is not a function like value in 'eval'")
-      }
+    App(func, arg) => {
+      let f_value = eval!(env, func)
+      elim_lambda!(f_value, eval!(env, arg))
+    }
     Let((x, _), e1, e2) => {
       let e1_value = eval!(env, e1)
       eval!(env.add(x, e1_value), e2)
@@ -89,45 +95,80 @@ fn fresh_name(names : NameList) -> String {
   }
 }
 
+// In typed NbE, each type can specify its own notion of equality, 
+// and thus the syntax of its normal forms. Therefore, reading back 
+// is now recursive on the structure of the type rather than 
+// the structure of the value.
+// 
+// Checking Dependent Types with Normalization by Evaluation: A Tutorial (Haskell Version)
+// David Thrane Christiansen (2019)
 ///|
-pub fn readback(value : Value, names : NameList) -> Syntax!Failure {
-  match value {
-    VNe(NeVar(x)) => Var(x)
-    VNe(NeApp(f, arg)) => {
-      let f = readback!(VNe(f), names)
+pub fn elim_lambda(f_value : Value, arg_value : Value) -> Value!Failure {
+  match f_value {
+    VLam(f) => f!(arg_value)
+    VNe(VPi(a, b), ne) => {
+      let bx = b!(arg_value)
+      VNe(bx, NeApp(ne, Nf(a, arg_value)))
+    }
+    _ => fail!("not a function like value in 'elim_lambda'")
+  }
+}
+
+///|
+fn readback_neutral(ntr : Neutral, names : NameList) -> Syntax!Failure {
+  match ntr {
+    NeVar(x) => Var(x)
+    NeApp(f, arg) => {
+      let f = readback_neutral!(f, names)
       let arg = readback!(arg, names)
       App(f, arg)
-    }
-    VSet(i) => Set(i)
-    VPi(param_ty_value, return_ty_func) => {
-      // original param name may coincide with variables in env
-      let name = fresh_name(names)
-      Pi(
-        name,
-        readback!(param_ty_value, names),
-        readback!(return_ty_func!(VNe(NeVar(name))), names.add(name)),
-      )
-    }
-    VLam(body_func) => {
-      // λx. t
-      // Generate a symbolic argument (neutral variable `x`)
-      // to trigger the normalization of body `t`
-      let name = fresh_name(names)
-      // Wrap the body with lambda abstraction.
-      Lam(name, readback!(body_func!(VNe(NeVar(name))), names.add(name)))
     }
   }
 }
 
 ///|
-fn normalize(env : VEnv, expr : Syntax) -> Syntax!Failure {
-  let env_names = []
-  for nval in env {
-    let (name, _) = nval
-    env_names.push(name)
+pub fn readback_type(typ : TypeVal, names : NameList) -> Syntax!Failure {
+  match typ {
+    VSet(i) => Set(i)
+    VPi(param_ty_value, return_ty_func) => {
+      let name = fresh_name(names)
+      let param_typ = readback_type!(param_ty_value, names)
+      let param_ty_value = VNe(param_ty_value, NeVar(name))
+      let return_typ = readback_type!(
+        return_ty_func!(param_ty_value),
+        names.add(name),
+      )
+      Pi(name, param_typ, return_typ)
+    }
+    VNe(_, ntr) => readback_neutral!(ntr, names)
+    _ => fail!("\{typ} is not a type in 'readback_type'")
   }
-  let used_names = @immut/list.from_array(env_names)
-  readback!(eval!(env, expr), used_names)
+}
+
+///|
+pub fn readback(nf : Normal, names : NameList) -> Syntax!Failure {
+  match nf {
+    Nf(VPi(a, b), f_value) => {
+      // Functions
+      // λx. t / neutral value
+      // Generate a symbolic argument (neutral variable `x`)
+      // to trigger the normalization of body `t`.
+      let x_name = fresh_name(names)
+      let x_value = VNe(a, NeVar(x_name))
+      let body_ty_value = b!(x_value)
+      let body_value = elim_lambda!(f_value, x_value)
+      // Wrap the body with lambda abstraction, i.e., η-expansion.
+      Lam(x_name, readback!(Nf(body_ty_value, body_value), names.add(x_name)))
+    }
+    Nf(VSet(_), value) => readback_type!(value, names)
+    Nf(nf_typ, VNe(ntr_typ, ntr)) => {
+      if not(types_equiv!(nf_typ, ntr_typ, names)) {
+        fail!("neutral type mismatch in readback: \{nf_typ} != \{ntr_typ}")
+      }
+      readback_neutral!(ntr, names)
+    }
+    _ => fail!("\{nf} is ill-typed normal form in 'readback'")
+  }
 }
 
 ///|
@@ -136,8 +177,8 @@ fn types_equiv(
   value2 : TypeVal,
   names : NameList
 ) -> Bool!Failure {
-  let expr1 = readback!(value1, names)
-  let expr2 = readback!(value2, names)
+  let expr1 = readback_type!(value1, names)
+  let expr2 = readback_type!(value2, names)
   expr1 == expr2
 }
 
@@ -157,15 +198,16 @@ pub fn TyCtx::empty() -> TyCtx {
   }
 }
 
+// Free variables comes from binding forms such as λx. t.
+// These free variables in Γ are neutral values 
+// since we don't know their values.
 ///|
-pub fn TyCtx::add_neutral_var(
+pub fn TyCtx::add_binding_var(
   self : TyCtx,
   name : String,
-  typ : Value
+  typ : TypeVal
 ) -> TyCtx {
-  // Free variables in Γ are neutral values 
-  // since we don't know their values.
-  let value = VNe(NeVar(name))
+  let value = VNe(typ, NeVar(name))
   TyCtx::{
     values: self.values.add(name, value),
     typs: self.typs.add(name, typ),
@@ -173,15 +215,16 @@ pub fn TyCtx::add_neutral_var(
   }
 }
 
+// Free variables comes from definitions such as let
+// In let binding, we would obtain the value of
+// variable in Γ, so we can use it as a value.
 ///|
-pub fn TyCtx::add_var(
+pub fn TyCtx::add_definition_var(
   self : TyCtx,
   name : String,
   value : Value,
   typ : TypeVal
 ) -> TyCtx {
-  // In let binding, we would obtain the value of
-  // variable in Γ, so we can use it as a value.
   TyCtx::{
     values: self.values.add(name, value),
     typs: self.typs.add(name, typ),
@@ -216,7 +259,7 @@ fn check_expr_is_type(ctx : TyCtx, expr : Syntax) -> Int!Failure {
 }
 
 ///|
-pub fn check(ctx : TyCtx, expr : Syntax, typ : Value) -> Unit!Failure {
+pub fn check(ctx : TyCtx, expr : Syntax, typ : TypeVal) -> Unit!Failure {
   // println("check \{expr} <= \{typ}")
   match expr {
     // A ~> (x : B) -> C[x]   Γ, x : B |- e : C[x] ~ t
@@ -224,12 +267,10 @@ pub fn check(ctx : TyCtx, expr : Syntax, typ : Value) -> Unit!Failure {
     // Γ |- λx. e <= A ~ λx. t
     Lam(param_name, body) =>
       match typ {
-        VPi(expected_param_ty_value, expected_return_ty_func) => {
-          let neutral_param_value = VNe(NeVar(param_name))
-          let ctx2 = ctx.add_var(
-            param_name, neutral_param_value, expected_param_ty_value,
-          )
-          let expected_return_ty = expected_return_ty_func!(neutral_param_value)
+        VPi(a, b) => {
+          let neutral_param_value = VNe(a, NeVar(param_name))
+          let ctx2 = ctx.add_definition_var(param_name, neutral_param_value, a)
+          let expected_return_ty = b!(neutral_param_value)
           check!(ctx2, body, expected_return_ty)
         }
         _ => fail!("\{typ} is not a dependent function type")
@@ -239,7 +280,7 @@ pub fn check(ctx : TyCtx, expr : Syntax, typ : Value) -> Unit!Failure {
       let x_typ_value = eval!(ctx.values, x_typ)
       let _ = check!(ctx, e1, x_typ_value)
       let e1_value = eval!(ctx.values, e1)
-      let ctx2 = ctx.add_var(x, e1_value, x_typ_value)
+      let ctx2 = ctx.add_definition_var(x, e1_value, x_typ_value)
       check!(ctx2, e2, typ)
     }
     // Γ |- e => B  A = B
@@ -256,14 +297,14 @@ pub fn check(ctx : TyCtx, expr : Syntax, typ : Value) -> Unit!Failure {
 }
 
 ///|
-pub fn infer(ctx : TyCtx, expr : Syntax) -> Value!Failure {
+pub fn infer(ctx : TyCtx, expr : Syntax) -> TypeVal!Failure {
   // println("infer \{expr}")
   let typ_val = match expr {
     // (x : A) ∈ Γ
     // ------------
     // Γ |- x => A
     Var(x) =>
-      match ctx.typs.find(x) {
+      match ctx.typs.get(x) {
         Some(typ) => typ
         None => fail!("does not find \{x} in env when inference!")
       }
@@ -291,7 +332,7 @@ pub fn infer(ctx : TyCtx, expr : Syntax) -> Value!Failure {
       // println("infer Pi \{param_name} : \{param_ty} => \{return_ty}")
       let param_universe = check_expr_is_type!(ctx, param_ty)
       let param_ty_value = eval!(ctx.values, param_ty)
-      let ctx2 = ctx.add_neutral_var(param_name, param_ty_value)
+      let ctx2 = ctx.add_binding_var(param_name, param_ty_value)
       let return_universe = check_expr_is_type!(ctx2, return_ty)
       VSet(@math.maximum(param_universe, return_universe))
     }
@@ -305,7 +346,7 @@ pub fn infer(ctx : TyCtx, expr : Syntax) -> Value!Failure {
       let _ = check!(ctx, e1, x_typ_value)
       let e1_value = eval!(ctx.values, e1)
       // println("let \{x} = \{e1_value}")
-      let ctx2 = ctx.add_var(x, e1_value, x_typ_value)
+      let ctx2 = ctx.add_definition_var(x, e1_value, x_typ_value)
       infer!(ctx2, e2)
     }
   }

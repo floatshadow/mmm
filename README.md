@@ -3,7 +3,7 @@
 ## Todo list
 
 - [x] untyped NbE
-- [ ] typed NbE for eta-equality
+- [x] typed NbE for eta-equality
 - [ ] builtin identity type
 - [ ] row polymorphism 
 
@@ -31,5 +31,6 @@ Dependent Pattern Matching:
   - [A simpler encoding of indexed types](https://dl.acm.org/doi/10.1145/3471875.3472991), Zhang.
 
 Codebases:
+  - [blott](https://github.com/jozefg/blott/), Gratzer and Sterling.
   - [minimal MLTT implementation step-by-step](https://gist.github.com/Guest0x0/e94d30077519ff9c64d6317035833461), Guest0x0.
   - [elaboration-zoon](https://github.com/AndrasKovacs/elaboration-zoo), Kovács.
