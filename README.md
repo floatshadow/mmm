@@ -4,7 +4,8 @@
 
 - [x] untyped NbE
 - [x] typed NbE for eta-equality
-- [ ] builtin identity type
+- [ ] holes and implicit arguments
+- [ ] dependent pattern matching
 - [ ] row polymorphism 
 
 ## References
