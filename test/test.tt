@@ -1,0 +1,32 @@
+
+data Nat : Set 0 where
+  Zero : Nat
+  Suc  : (_ : Nat) -> Nat
+
+data List (A : Set 0) : Set 0 where
+  Nil  : List A
+  Cons : (_ : A) -> (_ : List A) -> List A 
+
+
+data Vec (A : Set 0) : Nat -> Set 0 where
+  VNil  : Vec A Zero
+  VCons : {n : Nat} -> (_ : A) -> (_ : Vec A n) -> Vec A (Suc n)
+
+id : (A : Set 0) -> A -> A
+id A x = x
+
+--:normalize id
+--:checkctx
+
+plus : (_ : Nat) -> (_ : Nat) -> Nat
+plus zero     n = n
+plus (Succ m) n = Succ (plus m n)
+
+--:infer plus
+
+append : {A : _} -> {n : Nat} -> {m : Nat} -> (_ : Vec A n) -> (_ : Vec A m) -> Vec A (plus m n)
+append VNil         w = w
+append (VCons x xs) w = VCons x (append xs w)
+
+_ : Vec Nat (Suc (Suc (Suc Zero)))
+_ = append (VCons Zero VNil) (VCons (VCons (Suc Zero) VNil) Zero VNil) 
