@@ -1,6 +1,10 @@
 {
   "name": "floatshadow/rowmltt",
   "version": "0.1.0",
+  "deps": {
+    "Yoorkin/ArgParser": "0.1.9",
+    "moonbitlang/x": "0.4.23"
+  },
   "readme": "README.md",
   "license": "GPLv3",
   "description": "",

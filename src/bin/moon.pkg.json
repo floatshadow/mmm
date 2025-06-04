@@ -1,0 +1,10 @@
+{
+  "is-main": true,
+  "import": [
+    "Yoorkin/ArgParser",
+    "moonbitlang/x/sys",
+    "moonbitlang/x/fs",
+    "floatshadow/rowmltt/syntax",
+    "floatshadow/rowmltt/lexer"
+  ]
+}
