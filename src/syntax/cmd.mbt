@@ -1,4 +1,4 @@
-/// Top level declarations.
+///| Top level declarations.
 pub(all) enum Declaration {
   Mutual(Array[Declaration]) // mutual definition
   FunDef(Name, Type, Array[Clause]) // f : A [ks]
@@ -6,6 +6,7 @@ pub(all) enum Declaration {
   Command(Cmd)
 }
 
+///|
 pub(all) enum Cmd {
   Normalize(Expr)
   InferType(Name)
