@@ -1,8 +1,8 @@
 ///|
-typealias List[A] = @immut/list.T[A]
+typealias @immut/list.T as List
 
 ///|
-typealias T[A] = NonEmptyList[A]
+typealias NonEmptyList as T
 
 ///|
 pub(all) enum NonEmptyList[A] {
