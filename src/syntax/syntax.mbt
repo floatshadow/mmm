@@ -38,7 +38,7 @@ pub(all) type MetaVar Int derive(Eq, Hash)
 pub(all) enum Expr {
   Var(Name)
   Set(Int) // Set i
-  Pi(Telescope1, Type) // Π (x : A). B[x] or  Π {x : A}. B[x]
+  Pi(TypedBinding, Type) // Π (x : A). B[x] or  Π {x : A}. B[x]
   Lam(Name, Imp, Expr) // λ x . t or λ {x} . t
   App(Expr, Expr, Imp) // t1 t2 or t1 {t2}
   Let((String, Type), Expr, Expr) // let x : A = t1 in t2
@@ -118,10 +118,8 @@ fn PrettyExpr::print_one_level(
   match syntax {
     Var(name) => logger.write_string(name)
     Set(i) => logger.write_string("Set \{i}")
-    Pi(telescope, return_ty) => {
-      for bind in telescope {
-        logger.write_string("\{bind} ")
-      }
+    Pi(bind, return_ty) => {
+      logger.write_string("\{bind} ")
       logger.write_string(" -> ")
       self.print_one_level(logger, return_ty)
     }
