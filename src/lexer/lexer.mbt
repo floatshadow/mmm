@@ -1,11 +1,16 @@
+///|
 typealias MutMap = @hashmap.T[String, Keyword]
 
+///|
 typealias MutSet[T] = @hashset.T[T]
 
+///|
 typealias Loc = @util.Loc
 
-priv type! InvalidCharcode (Int, Loc) 
+///|
+priv type! InvalidCharcode (Int, Loc)
 
+///|
 pub struct Lexer {
   buffer : String
   flags : MutSet[Token]
@@ -14,20 +19,21 @@ pub struct Lexer {
   mut line : Int
 } derive(Show)
 
-
-
+///|
 pub enum Keyword {
   Let
   Where
   Data
 } derive(Hash, Eq, Show)
 
+///|
 pub enum Paired {
   Parenthesis
   Bracket
   Brace
 } derive(Hash, Eq, Show)
 
+///|
 pub enum TokenTag {
   Eof
   Newline
@@ -40,72 +46,86 @@ pub enum TokenTag {
   Error(String)
 } derive(Hash, Eq, Show)
 
+///|
 let keywords : MutMap = @hashmap.new()
 
+///|
 fn init {
   keywords["let"] = Keyword::Let
   keywords["where"] = Keyword::Where
   keywords["data"] = Keyword::Data
 }
 
+///|
 pub(all) struct Token {
   tag : TokenTag
   loc : Loc
   span : String
 } derive(Hash, Eq, Show)
 
+///|
 fn Token::new(tag : TokenTag, loc : Loc, span : String) -> Token {
   { tag, loc, span }
 }
 
-pub fn Lexer::new(s: String) -> Lexer {
+///|
+pub fn Lexer::new(s : String) -> Lexer {
   let buffer = StringBuilder::new(size_hint=s.length() + 1)
   buffer.write_string(s)
   buffer.write_char(Int::unsafe_to_char(0))
-  Lexer:: {
+  Lexer::{
     buffer: buffer.to_string(),
     flags: @hashset.new(),
     index: 0,
     colstart: 0,
-    line: 1
+    line: 1,
   }
 }
 
+///|
 pub fn Lexer::reset(self : Lexer) -> Unit {
   self.index = 0
   self.colstart = 0
   self.line = 1
 }
 
+///|
 fn Lexer::move_to_newline(self : Lexer) -> Unit {
   self.colstart = self.index
   self.line += 1
 }
 
+///|
 fn Lexer::get_loc(self : Lexer) -> Loc {
   { line: self.line, column: self.index - self.colstart + 1, index: self.index }
 }
 
+///|
 fn Lexer::make_span(self : Lexer, start : Int) -> String {
   self.buffer.substring(start~, end=self.index)
 }
 
+///|
 fn Lexer::make_token(self : Lexer, tag : TokenTag, loc : Loc) -> Token {
   Token::new(tag, loc, self.make_span(loc.index))
 }
 
+///|
 fn Lexer::make_error(self : Lexer, loc : Loc, msg : String) -> Token {
   Token::new(TokenTag::Error(msg), loc, self.make_span(loc.index))
 }
 
+///|
 fn Lexer::eof(self : Lexer) -> Token {
   Token::new(TokenTag::Eof, self.get_loc(), "<empty>")
 }
 
+///|
 fn Lexer::is_keyword(s : String) -> Keyword? {
   keywords.get(s)
 }
 
+///|
 fn Lexer::ch(self : Lexer) -> Char!InvalidCharcode {
   let charcode = self.buffer.charcode_at(self.index)
   match Int::to_char(charcode) {
@@ -114,6 +134,7 @@ fn Lexer::ch(self : Lexer) -> Char!InvalidCharcode {
   }
 }
 
+///|
 fn Lexer::ch_at(self : Lexer, i : Int) -> Char!InvalidCharcode {
   let charcode = self.buffer.charcode_at(self.index + i)
   match Int::to_char(charcode) {
@@ -122,11 +143,10 @@ fn Lexer::ch_at(self : Lexer, i : Int) -> Char!InvalidCharcode {
   }
 }
 
-
+///|
 fn Lexer::numeric_literal(self : Lexer, loc : Loc) -> Token!InvalidCharcode {
   let start = self.index
   self.index += 1
-
   while true {
     let n = self.ch!()
     if n < '0' || n > '9' {
@@ -137,18 +157,17 @@ fn Lexer::numeric_literal(self : Lexer, loc : Loc) -> Token!InvalidCharcode {
   try {
     let value = @strconv.parse_int!(
       self.buffer.substring(start~, end=self.index),
-    ) 
+    )
     self.make_token(TokenTag::IntLiteral(value), loc)
   } catch {
     StrConvError(msg) => self.make_error(loc, msg)
   }
 }
 
-
+///|
 fn Lexer::ident(self : Lexer, loc : Loc) -> Token!InvalidCharcode {
   while true {
-    let cond = 
-      (self.ch() >= 'a' && self.ch() <= 'z') ||
+    let cond = (self.ch() >= 'a' && self.ch() <= 'z') ||
       (self.ch() >= 'A' && self.ch() <= 'Z') ||
       self.ch() == '_' ||
       (self.ch() >= '0' && self.ch() <= '9')
@@ -158,12 +177,12 @@ fn Lexer::ident(self : Lexer, loc : Loc) -> Token!InvalidCharcode {
     self.index += 1
   }
   let tok = self.make_token(TokenTag::Identifer, loc)
-  Lexer::is_keyword(tok.span).map_or(
-    tok,
-    fn(kw) { Token::new(TokenTag::Kw(kw), loc, tok.span) },
-  )
+  Lexer::is_keyword(tok.span).map_or(tok, fn(kw) {
+    Token::new(TokenTag::Kw(kw), loc, tok.span)
+  })
 }
 
+///|
 fn Lexer::flag(self : Lexer) -> Array[Token]!InvalidCharcode {
   let res = []
   while true {
@@ -182,6 +201,7 @@ fn Lexer::flag(self : Lexer) -> Array[Token]!InvalidCharcode {
   res
 }
 
+///|
 fn Lexer::skip_comment(self : Lexer) -> Unit!InvalidCharcode {
   self.index += 2
   let mut has_flag = false
@@ -202,7 +222,12 @@ fn Lexer::skip_comment(self : Lexer) -> Unit!InvalidCharcode {
   }
 }
 
-fn Lexer::operator(self : Lexer, loc : Loc, first_c : Char) -> Token!InvalidCharcode {
+///|
+fn Lexer::operator(
+  self : Lexer,
+  loc : Loc,
+  first_c : Char
+) -> Token!InvalidCharcode {
   self.index += 1
   let buf = StringBuilder::new()
   buf.write_char(first_c)
@@ -210,20 +235,20 @@ fn Lexer::operator(self : Lexer, loc : Loc, first_c : Char) -> Token!InvalidChar
     ',' | ';' | '.' =>
       return self.make_token(TokenTag::Op(buf.to_string()), loc)
     '*' | '+' | '-' | '/' | '=' | '>' | '<' | '^' | '|' | '%' | ':' =>
-      while (match self.ch() {
-              '*' | '+' | '-' | '/' | '=' | '>' | '<' | '^' | '|' | '%' | ':' =>
-                true
-              _ => false
-            }) {
-        buf.write_char(self.ch())
-        self.index += 1
+      loop self.ch() {
+        '*' | '+' | '-' | '/' | '=' | '>' | '<' | '^' | '|' | '%' | ':' => {
+          buf.write_char(self.ch())
+          self.index += 1
+          continue self.ch()
+        }
+        _ => break
       }
     _ => return self.make_error(loc, "invalid operator")
   }
   self.make_token(TokenTag::Op(buf.to_string()), loc)
 }
 
-
+///|
 pub fn Lexer::next_err(self : Lexer) -> Token!Failure {
   let tok = self.next()
   match tok.tag {
@@ -232,6 +257,7 @@ pub fn Lexer::next_err(self : Lexer) -> Token!Failure {
   }
 }
 
+///|
 fn Lexer::next(self : Lexer) -> Token {
   try {
     while true {
@@ -241,11 +267,12 @@ fn Lexer::next(self : Lexer) -> Token {
         '\u{00}' => return self.eof()
         ' ' | '\t' | '\r' => {
           self.index += 1
-          while (match self.ch() {
-                  ' ' | '\t' | '\r' => true
-                  _ => false
-                }) {
-            self.index += 1
+          loop self.ch() {
+            ' ' | '\t' | '\r' => {
+              self.index += 1
+              continue self.ch()
+            }
+            _ => break
           }
           continue
         }
@@ -260,7 +287,10 @@ fn Lexer::next(self : Lexer) -> Token {
         }
         ')' => {
           self.index += 1
-          return self.make_token(TokenTag::PairedClose(Paired::Parenthesis), loc)
+          return self.make_token(
+            TokenTag::PairedClose(Paired::Parenthesis),
+            loc,
+          )
         }
         '[' => {
           self.index += 1
@@ -287,7 +317,7 @@ fn Lexer::next(self : Lexer) -> Token {
           } else {
             return self.operator(loc, c)
           }
-        '+' | '-' | ',' | ';' | ':' | '.' | '*' | '=' | '>' | '<' | '^' | '|' | '%' =>
+        '+' | ',' | ';' | ':' | '.' | '*' | '=' | '>' | '<' | '^' | '|' | '%' =>
           return self.operator(loc, c)
         _ =>
           if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' {
@@ -300,6 +330,7 @@ fn Lexer::next(self : Lexer) -> Token {
       return self.make_error(self.get_loc(), "unreachable")
     }
   } catch {
-    InvalidCharcode((charcode, loc)) => self.make_error(loc, "invalid character code: \{charcode}")
+    InvalidCharcode((charcode, loc)) =>
+      self.make_error(loc, "invalid character code: \{charcode}")
   }
 }
