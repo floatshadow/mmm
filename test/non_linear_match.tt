@@ -1,0 +1,69 @@
+
+data Nat : Set where
+| zero : Nat
+| suc  : Nat
+end
+
+data Id (A : Set) (x : A) : A -> Set where
+| refl : Id A x x
+end
+
+-- _<=_ relation
+data Leq : Nat -> Nat -> Set where
+| leqZero : (n : Nat) -> Leq zero n
+| leqSuc  : (n : Nat) -> (m : Nat) -> Leq n m -> Leq (suc n) (suc m)
+end
+
+-- 1 <= 2
+_ : Leq (suc zero) (suc (suc zero))
+_ = leqSuc zero (suc zero) (leqZero (suc zero))
+
+-- transivity of Leq relation
+Leq/trans : (k : Nat) -> (m : Nat) -> (n : Nat) -> Leq k m -> Leq m n -> Leq k n
+| Leq/trans zero    m       n       (LeqZero m)          (leq/m/n)            = LeqZero n
+| Leq/trans (suc k) (suc m) (suc n) (LeqSuc k m leq/k/m) (LeqSuc m n leq/m/n) = LeqSuc k n (Leq/trans k m n leq/k/m leq/m/n)
+end
+
+-- inaccesible pattern
+data Image (A : Set) (B : Set) (f : A -> B) : B -> Set where
+| imf : (x : A) -> Image A B f (f x)
+
+pred : Nat -> Nat
+| pred zero    = zero
+| pred (suc n) = n
+end
+
+-- pred zero = zero
+_ : Image Nat Nat pred zero
+| _ = imf zero
+end
+
+-- pred (suc zero) = zero
+_ : Image Nat Nat pred zero
+| _ = imf (suc zero)
+end
+
+-- pred (suc (suc zero)) = suc zero
+_ : Image Nat Nat pred (suc zero)
+| _ = imf (suc (suc zero))
+end
+
+invf : (A : Set) -> (B : Set) -> (f : A -> B) -> (y : B) -> Image A B f y -> A
+| invf A B f .(f x) (imf x) = x
+end
+
+-- https://agda.readthedocs.io/en/latest/language/function-definitions.html
+-- A dot pattern (also called inaccessible pattern) can be used 
+-- when the only type-correct value of the argument is determined by 
+-- the patterns given for the other arguments. A dot pattern is not 
+-- matched against to determine the result of a function call. 
+-- Instead it serves as checked documentation of the only possible value
+-- at the respective position, as determined by the other patterns. The syntax for a dot pattern is `.t`.
+
+data Twice : Nat -> Set where
+| twice : (m : Nat) -> Twice (plus m m)
+end
+
+half : (n : Nat) -> Twice n
+| half .(plus m m) (twice m) = m
+end
