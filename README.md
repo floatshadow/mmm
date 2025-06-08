@@ -1,9 +1,11 @@
-# Row-MLTT
+# RowMLTT
 
-## Todo list
+RowMLTT is a Agda-like, dependently typed toy language.
 
-- [x] untyped NbE
+## Features
+
 - [x] typed NbE for eta-equality
+- [ ] inductive data type and pattern matching
 - [ ] holes and implicit arguments
 - [ ] dependent pattern matching
 - [ ] row polymorphism 
