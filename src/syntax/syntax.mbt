@@ -184,3 +184,34 @@ pub impl Show for PrettyExpr with output(self, logger) {
   let logger = @util.IndentLogger::new(logger)
   self.print_one_level(logger, self.syntax)
 }
+
+///|
+pub impl Show for Pattern with output(self, logger) {
+  match self {
+    PVar(name) => logger.write_string(name)
+    PCon(name, pats) => {
+      logger.write_string("(\{name} ")
+      for pat in pats {
+        logger.write_string(" ")
+        Show::output(pat, logger)
+      }
+      logger.write_string(")")
+    }
+    PDot(expr) => {
+      logger.write_string(".(")
+      Show::output(expr.to_pretty(), logger)
+      logger.write_string(")")
+    }
+  }
+}
+
+///|
+pub impl Show for Clause with output(self, logger) {
+  logger.write_string("\{self.lhs_head} ")
+  for pat in self.lhs_pats {
+    logger.write_string(" ")
+    Show::output(pat, logger)
+  }
+  logger.write_string(" = ")
+  Show::output(self.rhs.to_pretty(), logger)
+}
