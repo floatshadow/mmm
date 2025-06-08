@@ -1,0 +1,212 @@
+%{
+typealias Declaration = @syntax.Declaration
+typealias Cmd = @syntax.Cmd
+typealias Name = @syntax.Name
+typealias Expr = @syntax.Expr
+typealias Imp = @syntax.Imp
+typealias Pattern = @syntax.Pattern
+typealias Clause = @syntax.Clause
+typealias TypedBinding = @syntax.TypedBinding
+typealias Type = @syntax.Type
+typealias Telescope = @syntax.Telescope
+%}
+
+
+%derive<Show> Token
+%derive<Show> ParseError
+%position<Int>
+%start start
+
+%token EOF
+%token<Int> NUMBER
+
+%token LPAREN       "("
+%token RPAREN       ")"
+%token LREC         "["
+%token RREC         "]"
+%token LCURLY       "{"
+%token RCURLY       "}"
+%token COLON        ":"
+
+%token LAMBDA       "\"
+
+%token EQ           "="
+%token QM           "?"
+%token ARROW        "->"
+
+%token CMD          "--:"
+%token DOT          "."
+%token DEFN         "::="
+%token BAR         "|"
+
+%token KW_SET       "Set"
+%token KW_LET       "let"
+%token KW_IN        "in"
+%token KW_DATA      "data"
+%token KW_WHERE     "where"
+%token KW_NORM      "normalize"
+%token KW_INFER     "infertype"
+%token KW_CHECK     "checkctx"
+%token KW_MUTUAL    "mutual"
+%token KW_END    "end"
+
+%token NEWLINE
+
+%token PLACEHOLDER
+%token<String> IDENT
+
+%type<Array[Declaration]> start
+%type<Array[Declaration]> defs
+
+%type<TypedBinding> typebinding
+
+%type<Declaration> decl
+%type<Declaration> fundef
+%type<Declaration> datadef
+%type<Declaration> mutual
+
+%type<Cmd> command
+
+
+%type<Expr> expr
+
+%type<Expr> expr_var
+%type<Expr> expr_set
+%type<Expr> expr_pi
+%type<Expr> expr_lam
+%type<Expr> expr_app
+%type<Expr> expr_let
+%type<Expr> expr_nonapp
+
+//%type<Expr> expr_meta
+//%type<Expr> expr_imeta
+//%type<Expr> expr_srcpos
+
+%type<Pattern> pat
+%type<Array[Pattern]> pats
+
+%type<Clause> clause
+%type<Array[Clause]> clauses
+%type<Array[(Name, Type)]> nametypes
+
+%type<Telescope> tele
+
+
+%right ARROW
+
+%%
+
+start
+  : defs EOF                 { $1 }
+  ;
+ 
+defs
+  :                               { [] }
+  | NEWLINE defs                  { $2 }
+  | decl NEWLINE defs             { [$1] + $3 }
+  ;
+
+decl
+  : command                          { Command($1) }
+  | fundef                           { $1 }
+  | datadef                           { $1 }
+  | mutual                           { $1 }
+  ;
+
+command
+  : CMD KW_CHECK                      { CheckCtx }
+   |CMD KW_INFER IDENT                      { InferType($3) }
+  | CMD KW_NORM expr                      { Normalize($3) }
+  ;
+
+
+expr
+  : expr_nonapp  { $1 }
+  | expr_app  { $1 }
+  ;
+
+expr_nonapp
+  : expr_var  { $1 }
+  | expr_set  { $1 }
+  | expr_pi  { $1 }
+  | expr_lam  { $1 }
+  | expr_let  { $1 }
+  | "(" expr ")" { $2 }
+  ;
+
+expr_var
+  : IDENT   { Expr::Var($1) }
+  ;
+
+expr_set
+  : KW_SET NUMBER  { Expr::Set($2) }
+  ;
+
+expr_pi
+  : typebinding ARROW expr { Expr::Pi($1, $3) }
+  ;
+
+expr_lam
+  : LAMBDA IDENT "." expr  { Expr::Lam($2, Imp::Explicit, $4) }
+  ;
+
+expr_app
+  : expr_nonapp expr  { Expr::App($1, $2, Imp::Explicit) }
+  | expr "{" expr "}"  { Expr::App($1, $3, Imp::Implicit) }
+  ;
+
+expr_let
+  : KW_LET IDENT ":" expr "=" expr KW_IN expr { Expr::Let(($2, $4), $6, $8) }
+  ;
+
+pats
+  :  { [] }
+  | pat pats { [$1] + $2 }
+  ;
+
+pat
+  : IDENT {PVar($1)}
+  | "(" IDENT pats ")" {PCon($2, $3)}
+  | "." "(" expr ")" {PDot($3)}
+  ;
+
+clause
+  : IDENT pats "=" expr  { Clause::{lhs_head : $1, lhs_pats : $2, rhs: $4} }
+  ;
+
+clauses 
+  :  { [] }
+  |  NEWLINE clauses { $2 }
+  |  "|" clause clauses { [$2] + $3 }
+  ;
+
+fundef
+  : IDENT ":" expr clauses KW_END { FunDef($1, $3, $4) }
+  ;
+
+mutual
+  : KW_MUTUAL "{" defs "}"  { Mutual($3) }
+  ;
+
+typebinding
+  : "(" IDENT ":" expr ")"  { (Some($2), Imp::Explicit, $4) }
+  | "{" IDENT ":" expr "}"  { (Some($2), Imp::Implicit, $4) }
+  | "(" expr ")"  { (None, Imp::Explicit, $2) }
+  | "{" expr "}"  { (None, Imp::Implicit, $2) }
+  | expr  { (None, Imp::Implicit, $1) }
+  ;
+
+tele
+  :  { [] }
+  |  typebinding tele { [$1] + $2 }
+  ;
+
+datadef
+  : KW_DATA IDENT tele ":" expr KW_WHERE nametypes KW_END { DataDef($2, $3, $5, $7) }
+  ;
+
+nametypes
+  :  { [] }
+  |  NEWLINE nametypes { $2 }
+  |  "|" IDENT ":" expr nametypes { [($2, $4)] + $5 }
+  ;

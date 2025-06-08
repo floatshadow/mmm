@@ -23,13 +23,13 @@ pub(all) enum Bd {
 } derive(Show, Eq)
 
 ///|
-pub type TypedBinding (Name?, Imp, Type)
+pub(all) type TypedBinding (Name?, Imp, Type)
 
 ///| (x : A) (y : B) (z : C) ... 
-pub typealias Telescope1 = List1[TypedBinding]
+pub(all) typealias Telescope1 = List1[TypedBinding]
 
 ///|
-pub typealias Telescope = List[TypedBinding]
+pub(all) typealias Telescope = Array[TypedBinding]
 
 ///|
 pub(all) type MetaVar Int derive(Eq, Hash)

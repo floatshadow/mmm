@@ -5,6 +5,7 @@
     "moonbitlang/x/sys",
     "moonbitlang/x/fs",
     "floatshadow/rowmltt/syntax",
-    "floatshadow/rowmltt/lexer"
+    "floatshadow/rowmltt/lexer",
+    "floatshadow/rowmltt/parser"
   ]
 }
