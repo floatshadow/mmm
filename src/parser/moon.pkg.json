@@ -1,13 +1,6 @@
 {
   "import": [
-    "floatshadow/rowmltt/syntax",
+    "floatshadow/rowmltt/syntax/concrete",
     "floatshadow/rowmltt/util"
-  ],
-  "pre-build": [
-    {
-      "command": "$mod_dir/.mooncakes/moonbitlang/yacc/moonyacc $input -o $output",
-      "input": "parser.mbty",
-      "output": "parser.mbt"
-    }
   ]
 }

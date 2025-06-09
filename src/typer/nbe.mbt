@@ -1,3 +1,13 @@
+// Normalization by evaluation.
+// Substitution based normalization simply repeatedly applies β-reduction.
+// NbE does normalization in a way of interpreting the term.
+// Major problems in developing NbE:
+//  - Term may contains free variables, how to eval such open terms?
+//    f a -> (fun x -> ...) a, but f may get stuck (neutral form)
+//    Solution: we admit free variables as a value.
+//  - Admit free variables as value would ban further evaluations.
+//    f arg1 arg2 ... ->
+//
 // In typed NbE, each type can specify its own notion of equality, 
 // and thus the syntax of its normal forms. Therefore, reading back 
 // is now recursive on the structure of the type rather than 
@@ -6,7 +16,10 @@
 // Checking Dependent Types with Normalization by Evaluation: A Tutorial (Haskell Version)
 // David Thrane Christiansen (2019)
 ///|
-typealias @syntax.Pattern
+typealias @abstract.Pattern
+
+///|
+typealias @abstract.TypedBinding
 
 ///| match one pattern against a value.
 fn match_pat(env : VEnv, pat : Pattern, v : Value) -> VEnv? {
@@ -295,7 +308,7 @@ pub fn readback_type(
         res_tyval!(param_ty_value),
         names.add(name),
       )
-      Pi(TypedBinding((Some(name), imp, param_typ)), return_typ)
+      Pi(@abstract.TypedBinding((Some(name), imp, param_typ)), return_typ)
     }
     VNe(_, ntr) => readback_neutral!(env, menv, sig, ntr, names)
     _ => fail!("\{typ} is not a type in 'readback_type'")

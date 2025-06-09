@@ -1,17 +1,17 @@
 ///|
-typealias @syntax.MetaVar
+typealias @abstract.MetaVar
 
 ///|
-typealias @syntax.Imp
+typealias @abstract.Imp
 
 ///|
-typealias @syntax.Name
+typealias @abstract.Name
 
 ///|
-typealias @syntax.Clause
+typealias @abstract.Clause
 
 ///|
-typealias @syntax.Telescope
+typealias @abstract.Telescope
 
 ///|
 typealias Spine = Array[(Normal, Imp)]

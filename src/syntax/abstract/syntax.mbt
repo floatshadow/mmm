@@ -26,9 +26,6 @@ pub(all) enum Bd {
 pub(all) type TypedBinding (Name?, Imp, Type)
 
 ///| (x : A) (y : B) (z : C) ... 
-pub(all) typealias Telescope1 = List1[TypedBinding]
-
-///|
 pub(all) typealias Telescope = Array[TypedBinding]
 
 ///|

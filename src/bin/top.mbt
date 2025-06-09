@@ -37,10 +37,8 @@ fn main {
     let contents = @fs.read_file_to_string!(file)
     let lex = @lexer.tokenize(contents)
     println("Lexer Finished, # Tokens: \{lex.length()}")
-
     let ast = @parser.start(lex)
     println("Parser Finished.")
-
   } catch {
     Failure(msg) => println("\{msg}")
     _ as err => println("\{err}")
