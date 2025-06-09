@@ -2,7 +2,6 @@
 typealias MutMap = @hashmap.T[String, Keyword]
 
 ///|
-typealias @hashset.T as MutSet
 
 ///|
 typealias @util.Loc
@@ -13,7 +12,7 @@ priv type! InvalidCharcode (Int, Loc)
 ///|
 pub struct Lexer {
   buffer : String
-  flags : MutSet[Token]
+  flags : Array[Array[Token]]
   mut index : Int
   mut colstart : Int
   mut line : Int
@@ -24,6 +23,7 @@ pub enum Keyword {
   Let
   Where
   Data
+  Postulate
 } derive(Hash, Eq, Show)
 
 ///|
@@ -54,6 +54,7 @@ fn init {
   keywords["let"] = Keyword::Let
   keywords["where"] = Keyword::Where
   keywords["data"] = Keyword::Data
+  keywords["postulate"] = Keyword::Postulate
 }
 
 ///|
@@ -75,7 +76,7 @@ pub fn Lexer::new(s : String) -> Lexer {
   buffer.write_char(Int::unsafe_to_char(0))
   Lexer::{
     buffer: buffer.to_string(),
-    flags: @hashset.new(),
+    flags: [],
     index: 0,
     colstart: 0,
     line: 1,
@@ -183,22 +184,40 @@ fn Lexer::ident(self : Lexer, loc : Loc) -> Token!InvalidCharcode {
 }
 
 ///|
-fn Lexer::flag(self : Lexer) -> Array[Token]!InvalidCharcode {
+fn Lexer::flag(self : Lexer) -> Array[Array[Token]]!InvalidCharcode {
   let res = []
+  let flag = []
   while true {
     let ident = self.ident(self.get_loc())
-    let flag = match ident.tag {
+    let arg = match ident.tag {
       TokenTag::Identifer => ident
       _ => self.make_error(ident.loc, "invalid flag \{ident.span}")
     }
-    res.push(flag)
-    if self.ch() == ';' {
+    flag.push(arg)
+    self.skip_inline_whitespace()
+    if self.ch() == '\n' || self.ch() == '\u{00}' {
+      res.push(flag.copy())
+      flag.clear()
+      break
+    }
+    self.index += 1
+  }
+  res
+}
+
+///|
+fn Lexer::skip_inline_whitespace(self : Lexer) -> Unit!InvalidCharcode {
+  while true {
+    let c = self.ch()
+    if c == '\u{00}' || c == '\n' {
+      break
+    } else if c == ' ' || c == '\t' || c == '\r' {
       self.index += 1
+      continue
     } else {
       break
     }
   }
-  res
 }
 
 ///|
@@ -215,7 +234,7 @@ fn Lexer::skip_comment(self : Lexer) -> Unit!InvalidCharcode {
     } else if self.ch() == ':' && not(has_flag) {
       self.index += 1
       has_flag = true
-      self.flag().each(fn(f) { self.flags.add(f) })
+      self.flag().each(fn(f) { self.flags.push(f) })
       continue
     }
     self.index += 1
@@ -232,11 +251,12 @@ fn Lexer::operator(
   let buf = StringBuilder::new()
   buf.write_char(first_c)
   match first_c {
-    ',' | ';' | '.' =>
+    // reserve single-character operator
+    ':' | ';' | '.' | '|' =>
       return self.make_token(TokenTag::Op(buf.to_string()), loc)
-    '*' | '+' | '-' | '/' | '=' | '>' | '<' | '^' | '|' | '%' | ':' =>
+    '*' | '+' | '-' | '/' | '\\' | '=' | '>' | '<' | '^' | '%' =>
       loop self.ch() {
-        '*' | '+' | '-' | '/' | '=' | '>' | '<' | '^' | '|' | '%' | ':' => {
+        '*' | '+' | '-' | '/' | '\\' | '=' | '>' | '<' | '^' | '%' => {
           buf.write_char(self.ch())
           self.index += 1
           continue self.ch()
@@ -266,14 +286,7 @@ fn Lexer::next(self : Lexer) -> Token {
       match c {
         '\u{00}' => return self.eof()
         ' ' | '\t' | '\r' => {
-          self.index += 1
-          loop self.ch() {
-            ' ' | '\t' | '\r' => {
-              self.index += 1
-              continue self.ch()
-            }
-            _ => break
-          }
+          self.skip_inline_whitespace()
           continue
         }
         '\n' => {
@@ -317,8 +330,20 @@ fn Lexer::next(self : Lexer) -> Token {
           } else {
             return self.operator(loc, c)
           }
-        '+' | ',' | ';' | ':' | '.' | '*' | '=' | '>' | '<' | '^' | '|' | '%' =>
-          return self.operator(loc, c)
+        '+'
+        | ','
+        | ';'
+        | ':'
+        | '.'
+        | '*'
+        | '/'
+        | '\\'
+        | '='
+        | '>'
+        | '<'
+        | '^'
+        | '|'
+        | '%' => return self.operator(loc, c)
         _ =>
           if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' {
             return self.ident(loc)

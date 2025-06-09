@@ -35,10 +35,15 @@ fn main {
   }
   try {
     let contents = @fs.read_file_to_string!(file)
-    let lex = @lexer.tokenize(contents)
-    println("Lexer Finished, # Tokens: \{lex.length()}")
-    let ast = @parser.start(lex)
-    println("Parser Finished.")
+    let lexer = @lexer.Lexer::new(contents)
+    println("Lexer initialized with file: \{contents}")
+    while true {
+      match lexer.next_err!() {
+        { tag: @lexer.TokenTag::Eof, .. } => break
+        _ as tok => println("\{tok}")
+      }
+    }
+    println("\{lexer.flags}")
   } catch {
     Failure(msg) => println("\{msg}")
     _ as err => println("\{err}")
