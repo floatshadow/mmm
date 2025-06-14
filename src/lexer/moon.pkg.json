@@ -1,6 +1,5 @@
 {
   "import": [
-    "floatshadow/rowmltt/syntax/concrete",
     "floatshadow/rowmltt/util"
   ]
 }

@@ -2,6 +2,10 @@
 typealias MutMap = @hashmap.T[String, Keyword]
 
 ///|
+typealias @queue.T as Queue
+
+///|
+typealias @util.NonEmptyList as List1
 
 ///|
 typealias @util.Loc
@@ -13,6 +17,8 @@ priv type! InvalidCharcode (Int, Loc)
 pub struct Lexer {
   buffer : String
   flags : Array[Array[Token]]
+  mut indents : List1[Int]
+  tokenbuf : Queue[Token]
   mut index : Int
   mut colstart : Int
   mut line : Int
@@ -34,9 +40,11 @@ pub enum Paired {
 } derive(Hash, Eq, Show)
 
 ///|
-pub enum TokenTag {
+pub(all) enum TokenTag {
   Eof
   Newline
+  Indent
+  Outdent
   Identifer
   Kw(Keyword)
   IntLiteral(Int)
@@ -77,6 +85,8 @@ pub fn Lexer::new(s : String) -> Lexer {
   Lexer::{
     buffer: buffer.to_string(),
     flags: [],
+    indents: List1::singleton(0),
+    tokenbuf: @queue.new(),
     index: 0,
     colstart: 0,
     line: 1,
@@ -270,21 +280,93 @@ fn Lexer::operator(
 
 ///|
 pub fn Lexer::next_err(self : Lexer) -> Token!Failure {
-  let tok = self.next()
-  match tok.tag {
-    TokenTag::Error(msg) => fail!(msg)
-    _ => tok
+  match self.tokenbuf.pop() {
+    Some(tok) =>
+      match tok.tag {
+        TokenTag::Error(msg) => fail!(msg)
+        _ => tok
+      }
+    None => {
+      self.lex()
+      self.next_err()
+    }
   }
 }
 
 ///|
-fn Lexer::next(self : Lexer) -> Token {
+fn Lexer::push_token(self : Lexer, tok : Token) -> Unit {
+  self.tokenbuf.push(tok)
+}
+
+///|
+fn Lexer::indent_level(self : Lexer, loc : Loc) -> Int?!InvalidCharcode {
+  // compute the indent level
+  if loc.column != 1 {
+    // indent must start at leading whitespace (spaces and tabs)
+    return None
+  }
+  let mut indent = 0
+  while true {
+    let c = self.ch()
+    // empty line or end of file: this is not a logical line.
+    if c == '\u{00}' || c == '\n' {
+      return None
+    } else if c == '-' {
+      // handling comments
+      if self.ch_at(1) == '-' {
+        return None
+      } else {
+        break
+      }
+    } else if c == ' ' || c == '\t' || c == '\r' {
+      self.index += 1
+      indent += 1
+      continue
+    } else {
+      break
+    }
+  }
+  Some(indent)
+}
+
+///| Given the new indent level, generate appropriate INDENT or OUTDENT token(s).
+fn Lexer::indent(self : Lexer, indent : Int) -> Unit {
+  let top_level = self.indents.head()
+  if indent == top_level {
+    // nothing happens
+    return
+  } else if indent > top_level {
+    self.push_token(
+      Token::new(TokenTag::Indent, self.get_loc(), "<indent \{indent}>"),
+    )
+    self.indents = self.indents.cons(indent)
+  } else if indent < top_level {
+    let mut top_level = top_level
+    while indent < top_level {
+      self.push_token(
+        Token::new(TokenTag::Outdent, self.get_loc(), "<outdent \{top_level}>"),
+      )
+      self.indents = self.indents.drop(1).unwrap()
+      top_level = self.indents.head()
+    }
+  }
+}
+
+///|
+fn Lexer::lex(self : Lexer) -> Unit {
   try {
     while true {
       let c = self.ch()
       let loc = self.get_loc()
+      if self.indent_level(loc) is Some(indent) {
+        self.indent(indent)
+      }
       match c {
-        '\u{00}' => return self.eof()
+        '\u{00}' => {
+          self.indent(0)
+          self.push_token(self.eof())
+          break
+        }
         ' ' | '\t' | '\r' => {
           self.skip_inline_whitespace()
           continue
@@ -292,43 +374,62 @@ fn Lexer::next(self : Lexer) -> Token {
         '\n' => {
           self.index += 1
           self.move_to_newline()
-          return self.make_token(TokenTag::Newline, loc)
+          self.push_token(self.make_token(TokenTag::Newline, loc))
+          break
         }
         '(' => {
           self.index += 1
-          return self.make_token(TokenTag::PairedOpen(Paired::Parenthesis), loc)
+          self.push_token(
+            self.make_token(TokenTag::PairedOpen(Paired::Parenthesis), loc),
+          )
+          break
         }
         ')' => {
           self.index += 1
-          return self.make_token(
-            TokenTag::PairedClose(Paired::Parenthesis),
-            loc,
+          self.push_token(
+            self.make_token(TokenTag::PairedClose(Paired::Parenthesis), loc),
           )
+          break
         }
         '[' => {
           self.index += 1
-          return self.make_token(TokenTag::PairedOpen(Paired::Bracket), loc)
+          self.push_token(
+            self.make_token(TokenTag::PairedOpen(Paired::Bracket), loc),
+          )
+          break
         }
         ']' => {
           self.index += 1
-          return self.make_token(TokenTag::PairedClose(Paired::Bracket), loc)
+          self.push_token(
+            self.make_token(TokenTag::PairedClose(Paired::Bracket), loc),
+          )
+          break
         }
         '{' => {
           self.index += 1
-          return self.make_token(TokenTag::PairedOpen(Paired::Brace), loc)
+          self.push_token(
+            self.make_token(TokenTag::PairedOpen(Paired::Brace), loc),
+          )
+          break
         }
         '}' => {
           self.index += 1
-          return self.make_token(TokenTag::PairedClose(Paired::Brace), loc)
+          self.push_token(
+            self.make_token(TokenTag::PairedClose(Paired::Brace), loc),
+          )
+          break
         }
-        '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
-          return self.numeric_literal(loc)
+        '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
+          self.push_token(self.numeric_literal(loc))
+          break
+        }
         '-' =>
           if self.ch_at(1) == '-' {
             self.skip_comment()
             continue
           } else {
-            return self.operator(loc, c)
+            self.push_token(self.operator(loc, c))
+            break
           }
         '+'
         | ','
@@ -343,19 +444,24 @@ fn Lexer::next(self : Lexer) -> Token {
         | '<'
         | '^'
         | '|'
-        | '%' => return self.operator(loc, c)
+        | '%' => {
+          self.push_token(self.operator(loc, c))
+          break
+        }
         _ =>
           if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' {
-            return self.ident(loc)
+            self.push_token(self.ident(loc))
+            break
           } else {
-            return self.make_error(loc, "invalid character: \{c}")
+            self.push_token(self.make_error(loc, "invalid character: \{c}"))
+            break
           }
       }
-    } else {
-      return self.make_error(self.get_loc(), "unreachable")
     }
   } catch {
     InvalidCharcode((charcode, loc)) =>
-      self.make_error(loc, "invalid character code: \{charcode}")
+      self.push_token(
+        self.make_error(loc, "invalid character code: \{charcode}"),
+      )
   }
 }
