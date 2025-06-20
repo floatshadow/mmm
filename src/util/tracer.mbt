@@ -1,5 +1,5 @@
 ///|
-typealias MutMap[T] = @hashmap.T[String, T]
+typealias @hashmap.T[String, T] as MutMap[T]
 
 ///|
 typealias @buffer.Buffer
