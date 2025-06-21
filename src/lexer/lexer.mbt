@@ -10,6 +10,7 @@ typealias @util.NonEmptyList as List1
 ///|
 typealias @util.Loc
 
+///|
 typealias @util.Interval
 
 ///|
@@ -19,7 +20,8 @@ priv suberror InvalidCharcode (Int, Loc)
 pub struct Lexer {
   buffer : String
   mut indents : List1[Int]
-  tokenbuf : Queue[Token]
+  tokenbuf : Queue[(Token, Interval)]
+  mut last_token : Token?
   mut index : Int
   mut colstart : Int
   mut line : Int
@@ -37,7 +39,12 @@ pub enum Keyword {
   Normalize
 } derive(Hash, Eq, Show)
 
+///|
 typealias @parser.Token
+
+/// See https://github.com/agda/agda/blob/master/src/full/Agda/Syntax/Parser/Layout.hs
+/// to allow stacking of layout keywords on the same line.
+
 ///|
 let keywords : MutMap = @hashmap.new()
 
@@ -62,6 +69,7 @@ pub fn Lexer::new(s : String) -> Lexer {
     buffer: buffer.to_string(),
     indents: List1::singleton(0),
     tokenbuf: @queue.new(),
+    last_token: None,
     index: 0,
     colstart: 0,
     line: 1,
@@ -86,14 +94,14 @@ fn Lexer::get_loc(self : Lexer) -> Loc {
   { line: self.line, column: self.index - self.colstart + 1, index: self.index }
 }
 
+///|
 fn Lexer::make_span(self : Lexer, start : Loc) -> String {
   self.buffer.substring(start=start.index, end=self.index)
 }
 
-
 ///|
-fn Lexer::make_error(loc : Loc, msg : String) -> Token {
-  Token::ErrorMsg((loc, msg))
+fn Lexer::make_error(loc : Loc, msg : String) -> (Token, Interval) {
+  (Token::ErrorMsg((loc, msg)), Interval::new(loc, loc))
 }
 
 ///|
@@ -128,7 +136,7 @@ fn Lexer::ch_at(self : Lexer, i : Int) -> Char raise InvalidCharcode {
 fn Lexer::numeric_literal(
   self : Lexer,
   begin : Loc
-) -> Token raise InvalidCharcode {
+) -> (Token, Interval) raise InvalidCharcode {
   let start = self.index
   self.index += 1
   while true {
@@ -143,14 +151,18 @@ fn Lexer::numeric_literal(
       self.buffer.substring(start~, end=self.index),
     )
     let end = self.get_loc()
-    Token::IntLiteral((Interval::new(begin, end), value))
+    let interval = Interval::new(begin, end)
+    (Token::IntLiteral((interval, value)), interval)
   } catch {
     StrConvError(msg) => Lexer::make_error(begin, msg)
   }
 }
 
 ///|
-fn Lexer::ident(self : Lexer, begin : Loc) -> Token raise InvalidCharcode {
+fn Lexer::ident(
+  self : Lexer,
+  begin : Loc
+) -> (Token, Interval) raise InvalidCharcode {
   while true {
     let cond = (self.ch() >= 'a' && self.ch() <= 'z') ||
       (self.ch() >= 'A' && self.ch() <= 'Z') ||
@@ -165,7 +177,7 @@ fn Lexer::ident(self : Lexer, begin : Loc) -> Token raise InvalidCharcode {
   let interval = Interval::new(begin, end)
   let span = self.make_span(begin)
   let tok = Token::Id((interval, span))
-  Lexer::is_keyword(span).map_or(tok, fn(kw) {
+  let idkw = Lexer::is_keyword(span).map_or(tok, fn(kw) {
     match kw {
       Keyword::Set => Token::KwSet(interval)
       Keyword::Where => Token::KwWhere(interval)
@@ -177,27 +189,30 @@ fn Lexer::ident(self : Lexer, begin : Loc) -> Token raise InvalidCharcode {
       Keyword::Normalize => Token::KwNorm(interval)
     }
   })
+  (idkw, interval)
 }
 
 ///|
-fn Lexer::command(self : Lexer) -> Array[Array[Token]] raise InvalidCharcode {
+fn Lexer::command(
+  self : Lexer
+) -> Array[Array[(Token, Interval)]] raise InvalidCharcode {
   let res = []
-  let flag = []
+  let cmd = []
   while true {
     let begin = self.get_loc()
-    let ident = self.ident(begin)
+    let (ident, interval) = self.ident(begin)
     let arg = match ident {
-      Token::Id(_) | Token::KwCheck(_) | Token::KwInfer(_) | Token::KwNorm(_) => ident
+      Token::Id(_) | Token::KwCheck(_) | Token::KwInfer(_) | Token::KwNorm(_) =>
+        (ident, interval)
       _ => Lexer::make_error(begin, "invalid command argument \{ident}")
     }
-    flag.push(arg)
+    cmd.push(arg)
     self.skip_inline_whitespace()
     if self.ch() == '\n' || self.ch() == '\u{00}' {
-      res.push(flag.copy())
-      flag.clear()
+      res.push(cmd.copy())
+      cmd.clear()
       break
     }
-    self.index += 1
   }
   res
 }
@@ -219,19 +234,19 @@ fn Lexer::skip_inline_whitespace(self : Lexer) -> Unit raise InvalidCharcode {
 
 ///|
 fn Lexer::skip_comment(self : Lexer) -> Unit raise InvalidCharcode {
+  let loc = self.get_loc()
   self.index += 2
   let mut has_cmd = false
   while true {
     if self.ch() == '\u{00}' {
       break
     } else if self.ch() == '\n' {
-      self.index += 1
-      self.move_to_newline()
       break
     } else if self.ch() == ':' && not(has_cmd) {
       self.index += 1
       has_cmd = true
       let cmds = self.command()
+      self.push_token((Token::VSemi, Interval::new(loc, loc)))
       for cmd in cmds {
         self.push_tokens(cmd)
       }
@@ -246,34 +261,42 @@ fn Lexer::operator(
   self : Lexer,
   loc : Loc,
   first_c : Char
-) -> Token raise InvalidCharcode {
+) -> (Token, Interval) raise InvalidCharcode {
   self.index += 1
   match first_c {
     // reserve single-character operator
-    ':' => Token::SymColon(Interval::new(loc, loc))
-    '.' => Token::SymDot(Interval::new(loc, loc))
-    '=' => Token::SymEqual(Interval::new(loc, loc))
-    '_' => Token::SymUnderscore(Interval::new(loc, loc))
-    '(' => Token::SymOpenParen(Interval::new(loc, loc))
-    ')' => Token::SymCloseParen(Interval::new(loc, loc))
-    '{' => Token::SymOpenBrace(Interval::new(loc, loc))
-    '}' => Token::SymCloseBrace(Interval::new(loc, loc))
-    '\\' => Token::SymLambda(Interval::new(loc, loc))
+    ':' => (Token::SymColon(Interval::new(loc, loc)), Interval::new(loc, loc))
+    '.' => (Token::SymDot(Interval::new(loc, loc)), Interval::new(loc, loc))
+    '=' => (Token::SymEqual(Interval::new(loc, loc)), Interval::new(loc, loc))
+    '_' =>
+      (Token::SymUnderscore(Interval::new(loc, loc)), Interval::new(loc, loc))
+    '(' =>
+      (Token::SymOpenParen(Interval::new(loc, loc)), Interval::new(loc, loc))
+    ')' =>
+      (Token::SymCloseParen(Interval::new(loc, loc)), Interval::new(loc, loc))
+    '{' =>
+      (Token::SymOpenBrace(Interval::new(loc, loc)), Interval::new(loc, loc))
+    '}' =>
+      (Token::SymCloseBrace(Interval::new(loc, loc)), Interval::new(loc, loc))
+    '\\' => (Token::SymLambda(Interval::new(loc, loc)), Interval::new(loc, loc))
     '-' if self.ch() == '>' => {
-          self.index += 1
-          Token::SymArrow(Interval::new(loc, self.get_loc()))
-      }
+      self.index += 1
+      (
+        Token::SymArrow(Interval::new(loc, self.get_loc())),
+        Interval::new(loc, loc),
+      )
+    }
     _ => Lexer::make_error(loc, "invalid operator")
   }
 }
 
 ///|
-pub fn Lexer::next_err(self : Lexer) -> Token raise Failure {
+pub fn Lexer::next_err(self : Lexer) -> (Token, Interval) raise Failure {
   match self.tokenbuf.pop() {
-    Some(tok) =>
+    Some((tok, _) as spaned_token) =>
       match tok {
         ErrorMsg((_, msg)) => fail(msg)
-        _ => tok
+        _ => spaned_token
       }
     None => {
       self.lex()
@@ -283,11 +306,13 @@ pub fn Lexer::next_err(self : Lexer) -> Token raise Failure {
 }
 
 ///|
-fn Lexer::push_token(self : Lexer, tok : Token) -> Unit {
+fn Lexer::push_token(self : Lexer, tok : (Token, Interval)) -> Unit {
   self.tokenbuf.push(tok)
+  self.last_token = Some(tok.0)
 }
 
-fn Lexer::push_tokens(self : Lexer, toks : Array[Token]) -> Unit {
+///|
+fn Lexer::push_tokens(self : Lexer, toks : Array[(Token, Interval)]) -> Unit {
   for tok in toks {
     self.push_token(tok)
   }
@@ -319,26 +344,46 @@ fn Lexer::indent_level(self : Lexer, loc : Loc) -> Int? raise InvalidCharcode {
   Some(indent)
 }
 
-///| Given the new indent level, generate appropriate INDENT or OUTDENT token(s).
-fn Lexer::indent(self : Lexer, indent : Int) -> Unit {
+///|
+fn Lexer::offside(self : Lexer, bol : Loc, indent : Int) -> Unit {
   let top_level = self.indents.head()
+  let eoi = self.get_loc()
   if indent == top_level {
-    // nothing happens
+    // no change in indentation level, produce virtual semicolon
+    self.push_token((Token::VSemi, Interval::new(bol, eoi)))
     return
   } else if indent > top_level {
-    self.push_token(
-      Token::Indent,
-    )
     self.indents = self.indents.cons(indent)
   } else if indent < top_level {
     let mut top_level = top_level
     while indent < top_level {
-      self.push_token(
-        Token::Outdent
-      )
+      self.push_token((Token::VClose, Interval::new(bol, eoi)))
       self.indents = self.indents.drop(1).unwrap()
       top_level = self.indents.head()
     }
+    if indent == top_level {
+      self.push_token((Token::VSemi, Interval::new(bol, eoi)))
+    } else {
+      self.push_token(
+        Lexer::make_error(
+          bol,
+          "indentation error: expected \{top_level} bu got \{indent}",
+        ),
+      )
+    }
+  }
+}
+
+///|
+fn Lexer::peek_last_token(self : Lexer) -> Token? {
+  self.last_token
+}
+
+///|
+fn Lexer::is_layout_keyword(self : Lexer, tok : Token) -> Bool {
+  match tok {
+    Token::KwWhere(_) | Token::KwPostulate(_) | Token::KwMutual(_) => true
+    _ => false
   }
 }
 
@@ -348,13 +393,16 @@ fn Lexer::lex(self : Lexer) -> Unit {
     while true {
       let c = self.ch()
       let loc = self.get_loc()
-      if self.indent_level(loc) is Some(indent) {
-        self.indent(indent)
-      }
       match c {
         '\u{00}' => {
-          self.indent(0)
-          self.push_token(Lexer::eof())
+          let loc = self.get_loc()
+          let mut top_level = self.indents.head()
+          while 0 < top_level {
+            self.push_token((Token::VClose, Interval::new(loc, loc)))
+            self.indents = self.indents.drop(1).unwrap()
+            top_level = self.indents.head()
+          }
+          self.push_token((Lexer::eof(), Interval::new(loc, loc)))
           break
         }
         ' ' | '\t' | '\r' => {
@@ -364,7 +412,28 @@ fn Lexer::lex(self : Lexer) -> Unit {
         '\n' => {
           self.index += 1
           self.move_to_newline()
-          self.push_token(Token::Newline(loc))
+          match self.peek_last_token() {
+            Some(tok) if self.is_layout_keyword(tok) => {
+              let bol = self.get_loc()
+              if self.indent_level(bol) is Some(indent) {
+                let eoi = self.get_loc()
+                self.push_token((Token::VOpen, Interval::new(bol, eoi)))
+                if indent <= self.indents.head() {
+                  // empty layout
+                  self.push_token((Token::VClose, Interval::new(bol, eoi)))
+                } else {
+                  self.offside(bol, indent)
+                }
+              }
+            }
+            _ => {
+              // offside rules
+              let bol = self.get_loc()
+              if self.indent_level(bol) is Some(indent) {
+                self.offside(bol, indent)
+              }
+            }
+          }
           break
         }
         '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
@@ -379,12 +448,12 @@ fn Lexer::lex(self : Lexer) -> Unit {
             self.push_token(self.operator(loc, c))
             break
           }
-        ':' | '=' | '.' | '(' | ')' | '{' | '}' | '\\' => {
+        ':' | '=' | '.' | '_' | '(' | ')' | '{' | '}' | '\\' => {
           self.push_token(self.operator(loc, c))
           break
         }
         _ =>
-          if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' {
+          if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
             self.push_token(self.ident(loc))
             break
           } else {

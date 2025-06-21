@@ -18,12 +18,12 @@ typealias @util.Either
 %derive<Show> Token
 %derive<Show> ParseError
 %position<Loc>
-%start file
+%start parse_file
 
 %token Eof
-%token Indent
-%token Outdent
-%token <Loc> Newline
+%token VOpen
+%token VSemi
+%token VClose
 %token <(Loc, String)> ErrorMsg
 
 %token<(Interval, String)> Id
@@ -52,8 +52,11 @@ typealias @util.Either
 
 
 
-%type<Array[Declaration]> file
-%type<Array[Declaration]> Declarations
+%type<Array[Declaration]> parse_file
+%type<Array[Declaration]> TopDeclarations
+%type<List1[Declaration]> Declarations
+%type<Array[Declaration]> Declarations0
+%type<List1[Declaration]> Declarations1
 
 %type<TypedBinding> TypedBinding
 %type<UntypedBinding> UntypedBinding
@@ -84,15 +87,33 @@ typealias @util.Either
 
 
 
-file
-  : Declarations Eof                 { $1 }
+parse_file
+  : VSemi TopDeclarations Eof  { $2 }
   ;
 
+(* top level: Arbitrary declarations *)
 Declarations
-  :                                  { [] }
-  | Declarations Declaration         { $1.push($2); $1 }
+  : VOpen Declarations1 VClose       { $2 }
   ;
 
+Declarations0
+  : VOpen VClose                     { [] }
+  | Declarations                     { $1.to_array() }
+  ;
+
+
+Declarations1
+  : Declaration VSemi Declarations1  { $3.cons($1) }
+  | Declaration                      { List1::singleton($1) }
+  ;
+
+(* Top level declarations *)
+TopDeclarations
+  :                                  { [] }
+  | Declarations1                    { $1.to_array() }
+  ;
+
+(* declarations or commands *)
 Declaration
   : Cmd                              { $1 }
   | FunDefOrTypeSig                  { $1 }
@@ -106,6 +127,13 @@ Cmd
   | KwInfer BId                      { Command(NoRange, InferType($2)) }
   | KwNorm Expr                      { Command(NoRange, Normalize($2)) }
   ;
+
+
+BId
+  : Id                               { Name::new(HasRange::get_range($1.0), $1.1) }
+  | "_"                              { Name::new(NoRange, "_") }
+  ;
+
 
 
 (* Top level, function types *)
@@ -152,11 +180,6 @@ Application3
   | Expr3 Application3               { $2.cons($1) }
 
 
-BId
-  : Id                               { Name::new(HasRange::get_range($1.0), $1.1) }
-  | "_"                              { Name::new(NoRange, "_") }
-  ;
-
 UntypedBinding
   :  BId  "."                        { UntypedBinding((NoRange, $1, NotHiding)) }
   | "{" BId "}" "."                  { UntypedBinding((NoRange, $2, Hiding)) }
@@ -189,19 +212,19 @@ RHSOrTypeSig
   ;
 
 WhereClause
-  :                                     { NoWhere }
-  | "where" Indent Declarations Outdent { Where(HasRange::get_range($1), $3) }
+  :                               { NoWhere }
+  | "where" Declarations0         { Where(HasRange::get_range($1), $2) }
   ;
 
 DataDef
-  : "data" BId Telescope ":" Expr "where" Indent Declarations Outdent { DataDef(HasRange::get_range($1), $2, $3, $5, $8) }
+  : "data" BId Telescope ":" Expr "where" Declarations0 { DataDef(HasRange::get_range($1), $2, $3, $5, $7) }
   ;
 
 Mutual
-  : "mutual" Indent Declarations Outdent  { Mutual(HasRange::get_range($1), $3) }
+  : "mutual" Declarations0  { Mutual(HasRange::get_range($1), $2) }
   ;
 
 Postulate
-  : "postulate" Indent Declarations Outdent { Postulate(HasRange::get_range($1), $3) }
+  : "postulate" Declarations0 { Postulate(HasRange::get_range($1), $2) }
   ;
 
