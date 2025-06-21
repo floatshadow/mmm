@@ -1,6 +1,6 @@
 
 -- Natural number, trivial
-data Nat : Set  where
+data Nat : Set where
   zero : Nat
   suc  : (_ : Nat) -> Nat
 

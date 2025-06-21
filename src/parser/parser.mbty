@@ -80,8 +80,7 @@ typealias @util.Either
 %type<Declaration> Cmd
 
 
-
-%right SymArrow
+%right "->" 
 
 %%
 
@@ -139,7 +138,9 @@ BId
 (* Top level, function types *)
 Expr
   : TypedBinding "->" Expr           { Pi($1, $3) }
+  | Application3 "->" Expr           { Pi(TypedBinding((NoRange, Name::new(NoRange, "_"), NotHiding, raw_application($1))), $3) }
   | Expr1                            { $1 }
+  ;
 
 
 (* Level 1 : Application *)
@@ -176,7 +177,7 @@ Expr3
 
 (* application within `with` *)
 Application3
-  : Expr3                            { List1.singleton($1) }
+  : Expr3                            { List1::singleton($1) }
   | Expr3 Application3               { $2.cons($1) }
 
 
@@ -191,7 +192,6 @@ TypedBinding
   | "{" BId ":" Expr "}"             { TypedBinding((NoRange, $2,  Hiding,    $4)) }
   | "(" Expr ")"                     { TypedBinding((NoRange, Name::new(NoRange, "_"), NotHiding, $2)) }
   | "{" Expr "}"                     { TypedBinding((NoRange, Name::new(NoRange, "_"), Hiding,    $2)) }
-  | Expr                             { TypedBinding((NoRange, Name::new(NoRange, "_"), NotHiding, $1)) }
   ;
 
 Telescope

@@ -307,7 +307,6 @@ fn PrettyDecl::print_one_level(
       for tbind in tele {
         logger.write_string("\{tbind} ")
       }
-      Show::output(tele, logger)
       logger.write_string(" : ")
       PrettyExpr::print_one_level(logger, t)
       logger.write_string(" where\n")
