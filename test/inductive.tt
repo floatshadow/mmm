@@ -1,0 +1,35 @@
+
+-- Natural number, trivial
+data Nat : Set  where
+  zero : Nat
+  suc  : (_ : Nat) -> Nat
+
+-- List, parameterized data type
+data List (A : Set) : Set  where
+  nil  : List A
+  cons : A -> List A -> List A 
+
+-- Vec, indexed data type
+data Vec (A : Set) : Nat -> Set where
+  vnil  : Vec A zero
+  vcons : {n : Nat} -> A -> Vec A n -> Vec A (suc n)
+
+id : {A : Set} -> A -> A
+id x = x
+
+-- :NORM id
+-- :CHECKCTX
+
+plus : Nat -> Nat -> Nat
+plus zero     n = n
+plus (suc m)  n = suc (plus m n)
+
+-- :INFER plus
+
+append : {A : _} -> {n : Nat} -> {m : Nat} -> Vec A n -> Vec A m -> Vec A (plus m n) 
+append vnil         w = w
+append (vcons x xs) w = vcons x (append xs w)
+
+
+_ : Vec Nat (suc (suc (suc zero)))
+_ = append (vcons zero vnil) (vcons (suc zero) (vcons (suc (suc zero)) vnil)) 

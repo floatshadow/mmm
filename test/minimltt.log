@@ -1,0 +1,28 @@
+// [parser] parsed test/minimltt.tt successfully
+// [parser] postulate
+  Nat : Set 0
+  zero : Nat
+  suc : (_ : Nat)  -> Nat
+  Bool : Set 0
+  tt : Bool
+  ff : Bool
+  if : (_ : (_ : (_ : (A : Set 0)  -> Bool)  -> A)  -> A)  -> A
+  Vec : (_ : (_ : Set 0)  -> Nat)  -> Set 0
+  nil : (A : Set 0)  -> (Vec) (A) (zero) 
+  cons : (_ : (_ : (A : Set 0)  -> (n : Nat)  -> A)  -> (Vec) (A) (n) )  -> (Vec) (A) ((suc) (n) ) 
+  Eq : (_ : (_ : (A : Set 0)  -> A)  -> A)  -> Set 0
+  refl : (A : Set 0)  -> (a : A)  -> (Eq) (A) (a) (a) 
+  :CHECK CTX
+
+ex1 : (_ : (_ : Bool)  -> Bool)  -> Bool
+ex1 = λ x. λ y. (if) (Bool) (x) (y) (ff) 
+ex2 : (A : Set 0)  -> (B : (_ : A)  -> Set 0)  -> (f : (x : A)  -> (B) (x) )  -> (a : A)  -> (B) (a) 
+ex2 = λ A. λ B. λ f. λ a. (f) (a) 
+id : (_ : (A : Set 0)  -> A)  -> A
+id = λ A. λ a. a
+ex3 : (n : Nat)  -> (Eq) (Nat) ((id) (Nat) (n) ) (n) 
+ex3 = λ n. (refl) (Nat) (n) 
+ex4 : (A : Set 0)  -> (Eq) ((_ : A)  -> A) ((id) (A) ) ((ex2) (A) ((id) (A) ) ((id) (A) ) ) 
+ex4 = λ A. (refl) ((_ : A)  -> A) ((id) (A) ) 
+:INFER ex1
+
