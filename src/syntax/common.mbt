@@ -1,0 +1,83 @@
+///|
+typealias @util.Range
+
+///| 
+pub struct Name {
+  range : Range
+  name : String
+}
+
+///|
+pub fn Name::new(range : Range, name : String) -> Name {
+  Name::{ name, range }
+}
+
+///|
+pub fn Name::unname(self : String) -> Bool {
+  self == "_"
+}
+
+///| Implicit attribute..
+pub(all) enum Hiding {
+  Hiding // {x : A} or f {u}
+  NotHiding // (x : A) or f u
+} derive(Show, Eq)
+
+///|
+pub(all) enum Bounding {
+  Bound
+  Defined
+} derive(Show, Eq)
+
+///| e, (x = e) or {x = e}
+pub(all) type NamedArg[T] (Range, Name?, Hiding, T) derive(Show)
+
+///|
+pub fn[A, B] NamedArg::fmap(
+  self : NamedArg[A],
+  f : (A) -> B raise
+) -> NamedArg[B] raise {
+  match self {
+    NamedArg((r, x, hiding, v)) => NamedArg((r, x, hiding, f(v)))
+  }
+}
+
+///|
+pub typealias @immut/hashmap.T[String, String] as NameMap
+
+///|
+pub typealias @immut/list.T[String] as NameList
+
+///| Naive fresh name generator.
+pub fn fresh_name(names : NameList) -> String {
+  loop 0 {
+    i => {
+      let name = "x\{i}"
+      if names.contains(name) {
+        continue i + 1
+      } else {
+        break name
+      }
+    }
+  }
+}
+
+///|
+pub impl Show for Name with output(self, logger) {
+  Show::output(self.name, logger)
+}
+
+///|
+pub impl Eq for Name with op_equal(self, other) {
+  self.name == other.name
+}
+
+///|
+pub impl Hash for Name with hash_combine(self, h) {
+  h.combine(self.name)
+}
+
+///|
+pub impl @util.HasRange for Name with get_range(self) {
+  self.range
+}

@@ -1,1 +1,6 @@
-{}
+{
+  "import": [
+    "floatshadow/rowmltt/util",
+    "floatshadow/rowmltt/syntax"
+  ]
+}

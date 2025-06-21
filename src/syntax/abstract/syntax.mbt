@@ -2,31 +2,19 @@
 typealias @util.Loc
 
 ///|
-typealias @immut/list.T as List
+typealias @syntax.Name
 
 ///|
-typealias @util.NonEmptyList as List1
+typealias @syntax.Hiding
 
 ///|
-pub typealias String as Name
-
-///| Implicit attribute..
-pub(all) enum Imp {
-  Implicit // {x : A} or f {u}
-  Explicit // (x : A) or f u
-} derive(Show, Eq)
+typealias @syntax.Bounding
 
 ///|
-pub(all) enum Bd {
-  Bound
-  Defined
-} derive(Show, Eq)
-
-///|
-pub(all) type TypedBinding (Name?, Imp, Type)
+pub(all) type TypedBinding (Name?, Hiding, Type)
 
 ///| (x : A) (y : B) (z : C) ... 
-pub(all) typealias Telescope = Array[TypedBinding]
+pub typealias Array[TypedBinding] as Telescope
 
 ///|
 pub(all) type MetaVar Int derive(Eq, Hash)
@@ -36,11 +24,12 @@ pub(all) enum Expr {
   Var(Name)
   Set(Int) // Set i
   Pi(TypedBinding, Type) // Π (x : A). B[x] or  Π {x : A}. B[x]
-  Lam(Name, Imp, Expr) // λ x . t or λ {x} . t
-  App(Expr, Expr, Imp) // t1 t2 or t1 {t2}
+  Lam(Name, Hiding, Expr) // λ x . t or λ {x} . t
+  App(Expr, Expr, Hiding) // t1 t2 or t1 {t2}
   Let((String, Type), Expr, Expr) // let x : A = t1 in t2
   Meta(MetaVar) // ?m
-  InsertedMeta(MetaVar, Array[Bd]) // ?m [spine]
+  Hole
+  InsertedMeta(MetaVar, Array[Bounding]) // ?m [spine]
   SrcPos(Loc, Expr) // debug
 } derive(Show)
 
@@ -61,9 +50,24 @@ pub(all) struct Clause {
   rhs : Expr
 }
 
+///| Top level declarations.
+pub(all) enum Declaration {
+  Mutual(Array[Declaration]) // mutual definition
+  FunDef(Name, Type, Array[Clause]) // f : A [ks]
+  DataDef(Name, Telescope, Type, Array[(Name, Type)]) // data D : A where [c : A]
+  Command(Cmd)
+}
+
+///|
+pub(all) enum Cmd {
+  Normalize(Expr)
+  InferType(Name)
+  CheckCtx
+}
+
 ///|
 pub impl Show for MetaVar with output(self, logger) {
-  logger.write_string("?m\{self._}")
+  logger.write_string("?m\{self.inner()}")
 }
 
 ///|
@@ -77,12 +81,12 @@ pub impl Show for TypedBinding with output(self, logger) {
     TypedBinding((None, _, ty)) => logger.write_object(ty.to_pretty())
     TypedBinding((Some(name), imp, ty)) =>
       match imp {
-        Implicit => {
+        Hiding => {
           logger.write_string("{\{name} : ")
           logger.write_object(ty.to_pretty())
           logger.write_string("}")
         }
-        Explicit => {
+        NotHiding => {
           logger.write_string("(\{name} : ")
           logger.write_object(ty.to_pretty())
           logger.write_string(")")
@@ -113,7 +117,7 @@ fn PrettyExpr::print_one_level(
   syntax : Expr
 ) -> Unit {
   match syntax {
-    Var(name) => logger.write_string(name)
+    Var(name) => logger.write_string("\{name}")
     Set(i) => logger.write_string("Set \{i}")
     Pi(bind, return_ty) => {
       logger.write_string("\{bind} ")
@@ -123,8 +127,8 @@ fn PrettyExpr::print_one_level(
     Lam(param_name, imp, body) => {
       logger.write_string("λ ")
       match imp {
-        Implicit => logger.write_string("{\{param_name}}")
-        Explicit => logger.write_string("\{param_name}")
+        Hiding => logger.write_string("{\{param_name}}")
+        NotHiding => logger.write_string("\{param_name}")
       }
       logger.write_string(". ")
       self.print_one_level(logger, body)
@@ -132,12 +136,12 @@ fn PrettyExpr::print_one_level(
     App(func, arg, imp) => {
       self.print_one_level(logger, func)
       match imp {
-        Implicit => {
+        Hiding => {
           logger.write_string(" {")
           self.print_one_level(logger, arg)
           logger.write_string("}")
         }
-        Explicit => {
+        NotHiding => {
           logger.write_string(" ")
           self.print_one_level(logger, arg)
         }
@@ -162,6 +166,7 @@ fn PrettyExpr::print_one_level(
       logger.outdent()
     }
     Meta(mv) => logger.write_string("\{mv}")
+    Hole => logger.write_string("_")
     InsertedMeta(mv, spine) => {
       logger.write_string("\{mv} [")
       for bd in spine {
@@ -185,7 +190,7 @@ pub impl Show for PrettyExpr with output(self, logger) {
 ///|
 pub impl Show for Pattern with output(self, logger) {
   match self {
-    PVar(name) => logger.write_string(name)
+    PVar(name) => logger.write_string("\{name}")
     PCon(name, pats) => {
       logger.write_string("(\{name} ")
       for pat in pats {
