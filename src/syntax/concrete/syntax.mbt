@@ -5,10 +5,10 @@ typealias @syntax.Name
 typealias @syntax.Hiding
 
 ///| (x : e) or {xs : e}
-pub(all) type TypedBinding (Range, Name, Hiding, Type) derive(Show)
+pub(all) type TypedBinding (Range, Name, Hiding, Type)
 
 ///| \ x or \ {x}
-pub(all) type UntypedBinding (Range, Name, Hiding) derive(Show)
+pub(all) type UntypedBinding (Range, Name, Hiding)
 
 ///| (x : A) (y : B) (z : C) ... 
 pub typealias Array[TypedBinding] as Telescope
@@ -29,7 +29,7 @@ pub(all) enum Expr {
   RawApp(Range, Array[Expr]) // t1 t2 ... tn
   HiddenArg(Range, Name?, Expr) // {e} or {x = e}
   Dot(Range, Expr) // .p, only in patterns
-} derive(Show)
+}
 
 ///|
 pub typealias Expr as Type
@@ -41,14 +41,13 @@ pub(all) enum Pattern {
   PHiddenArg(Range, Name?, Pattern) // {x} or {x = p}
   PWild(Range) // _ (wildcard pattern)
   PDot(Range, Expr) // inaccessible pattern .e
-  PHidden(Range, Pattern)
-} derive(Show)
+}
 
 ///|
 pub(all) enum WhereClause {
   NoWhere
   Where(Range, Array[Declaration])
-} derive(Show)
+}
 
 ///| Top level declarations.
 pub(all) enum Declaration {
@@ -58,14 +57,14 @@ pub(all) enum Declaration {
   DataDef(Range, Name, Telescope, Type, Array[Declaration]) // data D : A where [c : A]
   Postulate(Range, Array[Declaration])
   Command(Range, Cmd)
-} derive(Show)
+}
 
 ///|
 pub(all) enum Cmd {
   Normalize(Expr)
   InferType(Name)
   CheckCtx
-} derive(Show)
+}
 
 ///|
 pub fn Expr::to_pattern(self : Expr) -> Pattern? {
@@ -80,7 +79,7 @@ pub fn Expr::to_pattern(self : Expr) -> Pattern? {
           _ => PDot(r, e)
         }
       HiddenArg(r, x, e) => PHiddenArg(r, x, go(e))
-      _ => fail("Cannot convert expression to pattern: \{e}")
+      _ => fail("Cannot convert expression to pattern: \{e.to_pretty()}")
     }
   }
 
@@ -125,7 +124,6 @@ pub impl @util.HasRange for Pattern with get_range(self) {
     PHiddenArg(r, _, _) => r
     PWild(r) => r
     PDot(r, _) => r
-    PHidden(r, _) => r
   }
 }
 
@@ -146,5 +144,235 @@ pub impl @util.HasRange for Declaration with get_range(self) {
     Mutual(r, _) => r
     Postulate(r, _) => r
     Command(r, _) => r
+  }
+}
+
+///|
+pub impl Show for TypedBinding with output(self, logger) {
+  match self {
+    TypedBinding((_, x, imp, ty)) =>
+      match imp {
+        Hiding => {
+          logger.write_string("{\{x} : ")
+          logger.write_object(ty.to_pretty())
+          logger.write_string("}")
+        }
+        NotHiding => {
+          logger.write_string("(\{x} : ")
+          logger.write_object(ty.to_pretty())
+          logger.write_string(")")
+        }
+      }
+  }
+}
+
+///|
+pub impl Show for UntypedBinding with output(self, logger) {
+  match self {
+    UntypedBinding((_, x, imp)) =>
+      match imp {
+        Hiding => logger.write_string("{\{x}}")
+        NotHiding => logger.write_string("\{x}")
+      }
+  }
+}
+
+///|
+pub fn TypedBinding::to_string(self : TypedBinding) -> String {
+  Show::to_string(self)
+}
+
+///|
+pub struct PrettyExpr {
+  syntax : Expr
+}
+
+///|
+pub fn Expr::to_pretty(self : Expr) -> PrettyExpr {
+  PrettyExpr::{ syntax: self }
+}
+
+///|
+fn PrettyExpr::print_one_level(
+  logger : @util.IndentLogger,
+  syntax : Expr
+) -> Unit {
+  match syntax {
+    Ident(x) => logger.write_string("\{x}")
+    Set(_, i) => logger.write_string("Set \{i}")
+    Pi(bind, return_ty) => {
+      logger.write_string("\{bind} ")
+      logger.write_string(" -> ")
+      PrettyExpr::print_one_level(logger, return_ty)
+    }
+    Lam(utbind, body) => {
+      logger.write_string("λ \{utbind}")
+      logger.write_string(". ")
+      PrettyExpr::print_one_level(logger, body)
+    }
+    RawApp(_, es) =>
+      for e in es {
+        logger.write_string("(")
+        PrettyExpr::print_one_level(logger, e)
+        logger.write_string(")")
+        logger.write_string(" ")
+      }
+    Hole(_) => logger.write_string("_")
+    HiddenArg(_, Some(name), e) => {
+      logger.write_string("{\{name} = ")
+      PrettyExpr::print_one_level(logger, e)
+      logger.write_string("}")
+    }
+    HiddenArg(_, None, e) => {
+      logger.write_string("{")
+      PrettyExpr::print_one_level(logger, e)
+      logger.write_string("}")
+    }
+    Dot(_, e) => PrettyExpr::print_one_level(logger, e)
+  }
+}
+
+///|
+pub impl Show for PrettyExpr with output(self, logger) {
+  let logger = @util.IndentLogger::new(logger)
+  PrettyExpr::print_one_level(logger, self.syntax)
+}
+
+///|
+pub impl Show for Pattern with output(self, logger) {
+  match self {
+    PDot(_) => logger.write_string(".")
+    PWild(_) => logger.write_string("_")
+    PHiddenArg(_, Some(x), p) => {
+      logger.write_string("{\{x} = ")
+      Show::output(p, logger)
+      logger.write_string("}")
+    }
+    PHiddenArg(_, None, p) => {
+      logger.write_string("{")
+      Show::output(p, logger)
+      logger.write_string("}")
+    }
+    PRawApp(_, ps) =>
+      for p in ps {
+        logger.write_string("(")
+        Show::output(p, logger)
+        logger.write_string(")")
+        logger.write_string(" ")
+      }
+    PIdent(x) => logger.write_string("\{x}")
+  }
+}
+
+///|
+pub impl Show for Cmd with output(self, logger) {
+  match self {
+    Normalize(e) => {
+      logger.write_string(":NORMALIZE ")
+      logger.write_object(e.to_pretty())
+    }
+    InferType(x) => logger.write_string(":INFER \{x}")
+    CheckCtx => logger.write_string(":CHECK CTX")
+  }
+}
+
+///|
+pub struct PrettyDecl {
+  decl : Declaration
+}
+
+///|
+pub fn Declaration::to_pretty(self : Declaration) -> PrettyDecl {
+  PrettyDecl::{ decl: self }
+}
+
+///|
+fn PrettyDecl::print_one_level(
+  self : PrettyDecl,
+  logger : @util.IndentLogger,
+  decl : Declaration
+) -> Unit {
+  match decl {
+    Postulate(_, ds) => {
+      logger.write_string("postulate\n")
+      logger.indent()
+      for d in ds {
+        self.print_one_level(logger, d)
+        logger.write_string("\n")
+      }
+      logger.outdent()
+    }
+    DataDef(_, d, tele, t, ds) => {
+      logger.write_string("data \{d} ")
+      for tbind in tele {
+        logger.write_string("\{tbind} ")
+      }
+      Show::output(tele, logger)
+      logger.write_string(" : ")
+      PrettyExpr::print_one_level(logger, t)
+      logger.write_string(" where\n")
+      logger.indent()
+      for d in ds {
+        self.print_one_level(logger, d)
+        logger.write_string("\n")
+      }
+      logger.outdent()
+    }
+    FunClause(p, e, wh) => {
+      Show::output(p, logger)
+      logger.write_string(" = ")
+      PrettyExpr::print_one_level(logger, e)
+      match wh {
+        NoWhere => ()
+        Where(_, ds) => {
+          logger.write_string("\n")
+          logger.indent()
+          logger.write_string("where\n")
+          for d in ds {
+            self.print_one_level(logger, d)
+            logger.write_string("\n")
+          }
+          logger.outdent()
+        }
+      }
+    }
+    TypeSig(x, t) => {
+      logger.write_string("\{x} : ")
+      PrettyExpr::print_one_level(logger, t)
+    }
+    Mutual(_, ds) => {
+      logger.write_string("mutual\n")
+      logger.indent()
+      for d in ds {
+        self.print_one_level(logger, d)
+        logger.write_string("\n")
+      }
+      logger.outdent()
+    }
+    Command(_, cmd) => Show::output(cmd, logger)
+  }
+}
+
+///|
+pub impl Show for PrettyDecl with output(self, logger) {
+  let logger = @util.IndentLogger::new(logger)
+  self.print_one_level(logger, self.decl)
+}
+
+///|
+pub struct PrettyDecls {
+  decls : Array[Declaration]
+}
+
+///|
+pub fn PrettyDecls::new(decls : Array[Declaration]) -> PrettyDecls {
+  PrettyDecls::{ decls, }
+}
+
+///|
+pub impl Show for PrettyDecls with output(self, logger) {
+  for ds in self.decls {
+    Show::output(ds.to_pretty(), logger)
+    logger.write_string("\n")
   }
 }

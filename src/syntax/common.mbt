@@ -64,7 +64,7 @@ pub fn fresh_name(names : NameList) -> String {
 
 ///|
 pub impl Show for Name with output(self, logger) {
-  Show::output(self.name, logger)
+  logger.write_string(self.name)
 }
 
 ///|
