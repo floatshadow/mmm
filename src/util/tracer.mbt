@@ -104,7 +104,7 @@ pub fn[T : Show] SubTracer::record(
 }
 
 ///|
-pub fn[T] SubTracer::abort(self : SubTracer, msg : String) -> T {
+pub fn[T] SubTracer::abort(self : SubTracer, msg : String) -> T raise {
   self.tracer.done(fn(name, s) { println("// [log::\{name}]\n\{s}") }, fn(
     name,
     s
@@ -160,8 +160,8 @@ pub fn Tracer::flush(self : Tracer) -> Unit {
 pub fn Tracer::done(
   self : Tracer,
   log : (String, String) -> Unit,
-  record : (String, String) -> Unit
-) -> Unit {
+  record : (String, String) -> Unit raise
+) -> Unit raise {
   self.flush()
   let log_buf = self.log_buf.to_array()
   log_buf.sort_by_key(fn(x) { x.0 })

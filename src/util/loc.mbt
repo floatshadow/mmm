@@ -1,9 +1,17 @@
 ///|
+typealias NonEmptyList as List1
+
+///|
 pub(all) struct Loc {
   mut line : Int
   mut column : Int
   mut index : Int
 } derive(Hash)
+
+///|
+pub fn Loc::empty() -> Loc {
+  Loc::{ line: 0, column: 0, index: -1 }
+}
 
 ///|
 pub impl Eq for Loc with op_equal(self, other) {
@@ -26,6 +34,11 @@ pub(all) struct Interval {
   start : Loc
   end : Loc
 } derive(Show, Hash, Eq)
+
+///|
+pub fn Interval::new(start : Loc, end : Loc) -> Interval {
+  Interval::{ start, end }
+}
 
 ///|
 pub fn Interval::merge(self : Interval, other : Interval) -> Interval {
@@ -62,11 +75,6 @@ pub fn Loc::to_string(self : Loc) -> String {
 }
 
 ///|
-pub fn Interval::new(start : Loc, end : Loc) -> Interval {
-  Interval::{ start, end }
-}
-
-///|
 pub fn Range::empty() -> Range {
   Range::NoRange
 }
@@ -81,8 +89,37 @@ pub fn Range::new(intervals : Array[Interval]) -> Range {
 }
 
 ///|
+pub impl HasRange for Interval with get_range(self) {
+  Range::Range([self])
+}
+
+///|
 pub impl HasRange for Range with get_range(self) {
   self
+}
+
+///|
+pub impl[A : HasRange] HasRange for Array[A] with get_range(self) {
+  self.fold(
+    fn(acc : Range, item : A) -> Range { Range::merge_range(acc, item) },
+    init=NoRange,
+  )
+}
+
+///|
+pub impl[A : HasRange] HasRange for List[A] with get_range(self) {
+  self.fold(
+    fn(acc : Range, item : A) -> Range { Range::merge_range(acc, item) },
+    init=NoRange,
+  )
+}
+
+///|
+pub impl[A : HasRange] HasRange for List1[A] with get_range(self) {
+  self.fold(
+    fn(acc : Range, item : A) -> Range { Range::merge_range(acc, item) },
+    init=NoRange,
+  )
 }
 
 ///|
