@@ -12,6 +12,9 @@ RowMLTT is a Agda-like, dependently typed toy language.
 
 ## References
 
+Indentation Sensitive Lexical Analysis:
+  - [Python 3 Documentation](https://docs.python.org/3/reference/lexical_analysis.html#indentation)
+
 Bidirectional Type Inference:
   - [Bidirectional Typing Rules: A Tutorial](https://davidchristiansen.dk/tutorials/bidirectional.pdf), Christiansen.
   - [Checking Dependent Types with Normalization by Evaluation: A Tutorial (Haskell Version)](https://davidchristiansen.dk/tutorials/implementing-types-hs.pdf), Christiansen.
