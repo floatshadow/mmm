@@ -1,14 +1,11 @@
 ///|
-typealias @util.Loc
-
-///|
-typealias @syntax.Name
-
-///|
 typealias @syntax.Hiding
 
 ///|
 typealias @syntax.Bounding
+
+///|
+typealias @syntax.DBId
 
 ///|
 typealias @immut/list.T as List
@@ -27,16 +24,17 @@ pub(all) type MetaVar Int derive(Eq, Hash)
 
 ///|
 pub(all) enum Expr {
-  Var(String)
+  Var(DBId) // de Burijn index #1
+  Def(String) // f
+  Con(String) // c
   Set(Int) // Set i
   Pi(TypedBinding, Type) // Π (x : A). B[x] or  Π {x : A}. B[x]
   Lam(UntypedBinding, Expr) // λ x . t or λ {x} . t
   App(Expr, Expr, Hiding) // t1 t2 or t1 {t2}
-  Let((String, Type), Expr, Expr) // let x : A = t1 in t2
+  Let(Array[Declaration], Expr) // let x : A = t1 in t2
   Meta(MetaVar) // ?m
   InsertedMeta(MetaVar, List[Bounding]) // ?m [spine]
-  SrcPos(Loc, Expr) // debug
-} derive(Show)
+}
 
 ///|
 pub typealias Expr as Type
@@ -57,16 +55,18 @@ pub(all) struct Clause {
 
 ///| Top level declarations.
 pub(all) enum Declaration {
+  Axiom(String, Type) // f : A
   Mutual(Array[Declaration]) // mutual definition
-  FunDef(Name, Type, Array[Clause]) // f : A [ks]
-  DataDef(Name, Telescope, Type, Array[(Name, Type)]) // data D : A where [c : A]
+  Postulate(Array[Declaration]) // postulate f : A
+  FunDef(String, Array[Clause])
+  DataDef(String, Telescope, Type, Array[Declaration]) // data D : A where [c : A]
   Command(Cmd)
 }
 
 ///|
 pub(all) enum Cmd {
   Normalize(Expr)
-  InferType(Name)
+  InferType(String)
   CheckCtx
 }
 
@@ -127,51 +127,46 @@ pub fn Expr::to_pretty(self : Expr) -> PrettyExpr {
 
 ///|
 fn PrettyExpr::print_one_level(
-  self : PrettyExpr,
   logger : @util.IndentLogger,
   syntax : Expr
 ) -> Unit {
   match syntax {
-    Var(name) => logger.write_string("\{name}")
+    Var(i) => logger.write_string("\{i}")
+    Def(x) => logger.write_string("\{x}")
+    Con(c) => logger.write_string("\{c}")
     Set(i) => logger.write_string("Set \{i}")
     Pi(tbind, return_ty) => {
       logger.write_string("\{tbind} -> ")
-      self.print_one_level(logger, return_ty)
+      PrettyExpr::print_one_level(logger, return_ty)
     }
     Lam(utbind, body) => {
       logger.write_string("λ \{utbind} . ")
-      self.print_one_level(logger, body)
+      PrettyExpr::print_one_level(logger, body)
     }
     App(func, arg, imp) => {
-      self.print_one_level(logger, func)
+      PrettyExpr::print_one_level(logger, func)
       match imp {
         Hiding => {
           logger.write_string(" {")
-          self.print_one_level(logger, arg)
+          PrettyExpr::print_one_level(logger, arg)
           logger.write_string("}")
         }
         NotHiding => {
           logger.write_string(" ")
-          self.print_one_level(logger, arg)
+          PrettyExpr::print_one_level(logger, arg)
         }
       }
     }
-    Let((x, x_typ), e1, e2) => {
-      logger.write_string("let \{x} : ")
-      self.print_one_level(logger, x_typ)
-      logger.write_string(" = ")
-      match e1 {
-        Let(_, _, _) => {
-          logger.write_string("\n")
-          logger.indent()
-          self.print_one_level(logger, e1)
-          logger.outdent()
-        }
-        _ => self.print_one_level(logger, e1)
-      }
-      logger.write_string("\n")
+    Let(decls, e) => {
+      logger.write_string("let  ")
       logger.indent()
-      self.print_one_level(logger, e2)
+      for d in decls {
+        PrettyDecl::print_one_level(logger, d)
+        logger.write_string("\n")
+      }
+      logger.outdent()
+      logger.write_string("in ")
+      PrettyExpr::print_one_level(logger, e)
       logger.outdent()
     }
     Meta(mv) => logger.write_string("\{mv}")
@@ -185,14 +180,13 @@ fn PrettyExpr::print_one_level(
       }
       logger.write_string("]")
     }
-    SrcPos(_, inner) => self.print_one_level(logger, inner)
   }
 }
 
 ///|
 pub impl Show for PrettyExpr with output(self, logger) {
   let logger = @util.IndentLogger::new(logger)
-  self.print_one_level(logger, self.syntax)
+  PrettyExpr::print_one_level(logger, self.syntax)
 }
 
 ///|
@@ -224,4 +218,102 @@ pub impl Show for Clause with output(self, logger) {
   }
   logger.write_string(" = ")
   Show::output(self.rhs.to_pretty(), logger)
+}
+
+///|
+pub impl Show for Cmd with output(self, logger) {
+  match self {
+    Normalize(e) => {
+      logger.write_string(":NORMALIZE ")
+      logger.write_object(e.to_pretty())
+    }
+    InferType(x) => logger.write_string(":INFER \{x}")
+    CheckCtx => logger.write_string(":CHECK CTX")
+  }
+}
+
+///|
+pub struct PrettyDecl {
+  decl : Declaration
+}
+
+///|
+pub fn Declaration::to_pretty(self : Declaration) -> PrettyDecl {
+  PrettyDecl::{ decl: self }
+}
+
+///|
+fn PrettyDecl::print_one_level(
+  logger : @util.IndentLogger,
+  decl : Declaration
+) -> Unit {
+  match decl {
+    Postulate(ds) => {
+      logger.write_string("postulate\n")
+      logger.indent()
+      for d in ds {
+        PrettyDecl::print_one_level(logger, d)
+        logger.write_string("\n")
+      }
+      logger.outdent()
+    }
+    DataDef(d, tele, t, ds) => {
+      logger.write_string("data \{d} ")
+      for tbind in tele {
+        logger.write_string("\{tbind} ")
+      }
+      logger.write_string(" : ")
+      PrettyExpr::print_one_level(logger, t)
+      logger.write_string(" where\n")
+      logger.indent()
+      for d in ds {
+        PrettyDecl::print_one_level(logger, d)
+        logger.write_string("\n")
+      }
+      logger.outdent()
+    }
+    FunDef(_, cs) =>
+      for clause in cs {
+        Show::output(clause, logger)
+        logger.write_string("\n")
+      }
+    Axiom(x, t) => {
+      logger.write_string("\{x} : ")
+      PrettyExpr::print_one_level(logger, t)
+    }
+    Mutual(ds) => {
+      logger.write_string("mutual\n")
+      logger.indent()
+      for d in ds {
+        PrettyDecl::print_one_level(logger, d)
+        logger.write_string("\n")
+      }
+      logger.outdent()
+    }
+    Command(cmd) => Show::output(cmd, logger)
+  }
+}
+
+///|
+pub impl Show for PrettyDecl with output(self, logger) {
+  let logger = @util.IndentLogger::new(logger)
+  PrettyDecl::print_one_level(logger, self.decl)
+}
+
+///|
+pub struct PrettyDecls {
+  decls : Array[Declaration]
+}
+
+///|
+pub fn PrettyDecls::new(decls : Array[Declaration]) -> PrettyDecls {
+  PrettyDecls::{ decls, }
+}
+
+///|
+pub impl Show for PrettyDecls with output(self, logger) {
+  for ds in self.decls {
+    Show::output(ds.to_pretty(), logger)
+    logger.write_string("\n")
+  }
 }

@@ -22,6 +22,12 @@ pub fn Name::to_raw_name(self : Name) -> String {
   self.name
 }
 
+///|
+pub(all) type DBId Int derive(Eq, Hash)
+
+///|
+pub(all) type DBlvl Int derive(Eq, Hash)
+
 ///| Implicit attribute..
 pub(all) enum Hiding {
   Hiding // {x : A} or f {u}
@@ -85,4 +91,19 @@ pub impl Hash for Name with hash_combine(self, h) {
 ///|
 pub impl @util.HasRange for Name with get_range(self) {
   self.range
+}
+
+///|
+pub fn lvl2idx(n_free_vars : Int, x : DBlvl) -> DBId {
+  DBId(n_free_vars - x.inner() - 1)
+}
+
+///|
+pub impl Show for DBId with output(self, logger) {
+  logger.write_string("#\{self.inner()}")
+}
+
+///|
+pub impl Show for DBlvl with output(self, logger) {
+  logger.write_string("ℓ\{self.inner()}")
 }

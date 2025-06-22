@@ -103,6 +103,15 @@ pub fn Expr::split_pi(self : Expr) -> (Telescope, Type) {
 }
 
 ///|
+pub fn Expr::telescope_pi(telescope : Telescope, codomain : Type) -> Type {
+  let mut ty = codomain
+  for tbind in telescope.rev() {
+    ty = Pi(tbind, ty)
+  }
+  ty
+}
+
+///|
 pub impl @util.HasRange for TypedBinding with get_range(self) {
   match self {
     TypedBinding((r, _, _, _)) => r

@@ -15,19 +15,20 @@
 // 
 // Checking Dependent Types with Normalization by Evaluation: A Tutorial (Haskell Version)
 // David Thrane Christiansen (2019)
+
 ///|
 typealias @abstract.Pattern
 
 ///|
-typealias @abstract.TypedBinding
+typealias @syntax.NameList
 
 ///| match one pattern against a value.
 fn match_pat(env : VEnv, pat : Pattern, v : Value) -> VEnv? {
   match (pat, v) {
     (PDot(_), _) => Some(env)
-    (PVar(x), _) => Some(env.add((Some(x), v)))
-    (PCon(name, []), VNe(_, NeCon(con, []))) if name == con => Some(env)
-    (PCon(name, pats), VNe(_, NeCon(con, spine))) if name == con =>
+    (PVar(x), _) => Some(env.add((x, v)))
+    (PCon(name, []), VNe(NeCon(con, []))) if name == con => Some(env)
+    (PCon(name, pats), VNe(NeCon(con, spine))) if name == con =>
       match_pats(env, pats, spine)
     _ => None
   }
@@ -41,11 +42,8 @@ fn match_pats(
 ) -> VEnv? {
   match (pats, spine) {
     ([], []) => Some(env)
-    ([pat, .. pats], [(Nf(_, v), imp), .. vs]) =>
-      match match_pat(env, pat, v) {
-        Some(env2) => match_pats(env2, pats, vs)
-        None => None
-      }
+    ([pat, .. pats], [(v, _), .. vs]) if match_pat(env, pat, v) is Some(env2) =>
+      match_pats(env2, pats, vs)
     _ => None
   }
 }
@@ -53,18 +51,17 @@ fn match_pats(
 ///|
 fn match_clause(
   env : VEnv,
-  menv : MetaEnv,
   sig : Sig,
   clause : Clause,
   spine : SpineView
-) -> Value?!Failure {
+) -> Value? raise Failure {
   let pats = clause.lhs_pats
   let rhs = clause.rhs
   guard spine.length() == pats.length() else {
-    fail!("arity of pattern \{pats} patterns and spine \{spine} does not match")
+    fail("arity of pattern \{pats} patterns and spine \{spine} does not match")
   }
   match match_pats(env, pats, spine) {
-    Some(env2) => Some(eval!(env2, menv, sig, rhs))
+    Some(env2) => Some(eval(env2, sig, rhs))
     None => None
   }
 }
@@ -72,209 +69,148 @@ fn match_clause(
 ///|
 fn match_clauses(
   env : VEnv,
-  menv : MetaEnv,
   sig : Sig,
   clauses : Array[Clause],
   spine : SpineView
-) -> Value?!Failure {
-  fn go(clauses : ArrayView[Clause]) -> Value?!Failure {
+) -> Value? raise Failure {
+  fn go(clauses : ArrayView[Clause]) -> Value? raise Failure {
     match clauses {
       [] => None
       [clause, .. clauses] =>
-        match match_clause!(env, menv, sig, clause, spine) {
+        match match_clause(env, sig, clause, spine) {
           Some(v) => Some(v)
           None => go(clauses)
         }
     }
   }
 
-  go!(clauses)
+  go(clauses)
 }
 
 ///| beta/iota-reduction
 fn eval_app(
   env : VEnv,
-  menv : MetaEnv,
   sig : Sig,
-  f_val : Value,
-  arg_val : Value,
-  imp : Imp
-) -> Value!Failure {
-  match f_val {
-    VLam(x_imp, body_val) => {
-      if x_imp != imp {
-        fail!(
-          "expected an \{x_imp} argument but an \{imp} argument applies in 'eval_app'",
+  f : Value,
+  v : Value,
+  vh : Hiding
+) -> Value raise Failure {
+  match f {
+    VLam(_, h, t) => {
+      guard h == vh else {
+        fail(
+          "expected an \{h} argument but an \{vh} argument applies in 'eval_app'",
         )
       }
-      body_val!(arg_val)
+      t(v)
     }
-    VNe(VPi(x_imp, a, b), ne) => {
-      if x_imp != imp {
-        fail!(
-          "expected an \{x_imp} argument but an \{imp} argument applies in 'eval_app'",
-        )
-      }
-      let b_val = b!(arg_val)
-      let nf = Nf(a, arg_val)
+    VNe(ne) =>
       match ne {
-        NeRigid(name, spine) =>
-          VNe(b_val, NeRigid(name, extend_spine(spine, nf, imp)))
-        NeFlex(mv, spine) =>
-          VNe(b_val, NeFlex(mv, extend_spine(spine, nf, imp)))
+        NeRigid(name, spine) => VNe(NeRigid(name, extend_spine(spine, v, vh)))
+        NeFlex(mv, spine) => VNe(NeFlex(mv, extend_spine(spine, v, vh)))
         NeDef(name, spine) => {
-          guard sig.funs.get(name) is Some(fun_def) else {
-            fail!("does not find function \{name} in signature")
+          guard sig.constants.get(name) is Some(fun_def) else {
+            fail("does not find function \{name} in signature")
           }
-          let clauses = fun_def.clauses
-          let spine2 = extend_spine(spine, nf, imp)
-          // delta/iota-reduction
-          if clauses.length() == spine2.length() {
-            match match_clauses!(env, menv, sig, clauses, spine2) {
-              Some(v) => v
-              None => VNe(b_val, NeDef(name, spine2))
-            }
-          } else {
-            VNe(b_val, NeDef(name, spine2))
+          let spine2 = extend_spine(spine, v, vh)
+          match fun_def.definitions {
+            Some(clauses) if clauses.length() == spine2.length() && match_clauses(env, sig, clauses, spine2)  is Some(v) => v
+            _ => VNe(NeDef(name, spine2))
           }
         }
-        NeCon(name, spine) => {
-          let spine2 = extend_spine(spine, nf, imp)
-          VNe(b_val, NeCon(name, spine2))
-        }
-        NeData(name, spine) => {
-          let spine2 = extend_spine(spine, nf, imp)
-          VNe(b_val, NeData(name, spine2))
-        }
+        NeCon(name, spine) => VNe(NeCon(name, extend_spine(spine, v, vh)))
       }
-    }
-    _ => fail!("not a function like value in 'eval_app'")
+    _ => fail("not a function like value in 'eval_app'")
   }
 }
 
 ///|
 fn eval_app_spine(
   env : VEnv,
-  menv : MetaEnv,
   sig : Sig,
   f_val : Value,
   spine : SpineView
-) -> Value!Failure {
+) -> Value raise Failure {
   let mut head = f_val
   for arg in spine {
-    let (Nf(_, arg_val), imp) = arg
-    head = eval_app!(env, menv, sig, head, arg_val, imp)
+    let (arg_val, imp) = arg
+    head = eval_app(env, sig, head, arg_val, imp)
   }
   head
 }
 
 ///|
-fn eval_meta(mv : MetaVar, menv : MetaEnv) -> Value!Failure {
-  match menv.find(mv) {
-    Some(MetaEntry::Solved(val, _)) => val
-    Some(MetaEntry::Unsolved(typ)) => {
+fn eval_meta(mv : MetaVar) -> Value raise Failure {
+  match lookup_meta(mv) {
+    Some(MetaEntry::Solved(_, val)) => val
+    Some(MetaEntry::Unsolved(_)) =>
       // Unsolved meta variable, return a neutral value.
-      let ne = Neutral::meta(mv)
-      VNe(typ, ne)
-    }
-    None => fail!("does not find meta variable \{mv} in metacontext")
-  }
-}
-
-///| variable in the raw expression may be a 
-/// free variable, function, or constructor.
-fn eval_var(x : String, env : VEnv, sig : Sig) -> Value!Failure {
-  match env.lookup(Some(x)) {
-    Some(v) => v
-    None =>
-      match sig.funs.get(x) {
-        Some(f) => VNe(f.ty, Neutral::def(f.name))
-        None =>
-          match sig.datas.get(x) {
-            Some(d) => VNe(d.ty, Neutral::data(d.name))
-            None =>
-              match sig.cons.get(x) {
-                Some(c) => VNe(c.ty, Neutral::con(c.name))
-                None => fail!("does not find \{x} in env when evaluation!")
-              }
-          }
-      }
+      VNe(Neutral::meta(mv))
+    None => fail("does not find meta variable \{mv} in metacontext")
   }
 }
 
 ///|
-pub fn eval(
-  env : VEnv,
-  menv : MetaEnv,
-  sig : Sig,
-  expr : Expr
-) -> Value!Failure {
+fn force_meta(env : VEnv, sig : Sig, value : Value) -> Value raise Failure {
+  match value {
+    VNe(NeFlex(mv, spine)) if lookup_meta(mv) is Some(Solved(v, _)) =>
+      force_meta(env, sig, eval_app_spine(env, sig, v, spine))
+    _ => value
+  }
+}
+///|
+pub fn eval(env : VEnv, sig : Sig, expr : Expr) -> Value raise Failure {
   match expr {
-    Var(x) => eval_var!(x, env, sig)
-    Meta(mv) => eval_meta!(mv, menv)
+    Var(ix) => match env.nth(ix.inner()) {
+      Some((_, v)) => v
+      None => fail("does not find variable \{ix} in environment \{env}")
+    }
+    Def(f) => VNe(Neutral::def(f))
+    Con(c) => VNe(Neutral::con(c))
+    Meta(mv) => eval_meta(mv)
     Set(i) => VSet(i)
-    Pi(TypedBinding((param_name, imp, param_ty)), res_ty) => {
-      let param_tyval = eval!(env, menv, sig, param_ty)
-      fn res_tyval(param_val) -> Value!Failure {
-        eval!(env.add((param_name, param_val)), menv, sig, res_ty)
+    Pi(TypedBinding((x, h, a)), b) => {
+      let a = eval(env, sig, a)
+      fn b_tyval(x_val) -> Value raise Failure {
+        eval(env.add((x, x_val)), sig, b)
       }
 
-      VPi(imp, param_tyval, res_tyval)
+      VPi(x, h, a, b_tyval)
     }
-    Lam(param_name, imp, body) => {
-      fn body_val(param_val) -> Value!Failure {
-        eval!(env.add((Some(param_name), param_val)), menv, sig, body)
+    Lam(UntypedBinding((x, h)), t) => {
+      fn t_val(x_val) -> Value raise Failure {
+        eval(env.add((x, x_val)), sig, t)
       }
 
-      VLam(imp, body_val)
+      VLam(x, h, t_val)
     }
-    App(f, arg, imp) => {
-      let f_val = eval!(env, menv, sig, f)
-      let arg_val = eval!(env, menv, sig, arg)
-      eval_app!(env, menv, sig, f_val, arg_val, imp)
+    App(f, arg, h) => {
+      let f = eval(env, sig, f)
+      let arg = eval(env, sig, arg)
+      eval_app(env, sig, f, arg, h)
     }
-    Let((x, _), e1, e2) => {
-      let e1_val = eval!(env, menv, sig, e1)
-      eval!(env.add((Some(x), e1_val)), menv, sig, e2)
-    }
+    Let(_) => fail("let expression is not supported in evaluation")
   }
 }
 
 // Reading back value to expressions.
 // Generate fresh name for normalization given used names.
-///|
-fn fresh_name(names : NameList) -> String {
-  loop 0 {
-    i => {
-      let name = "x\{i}"
-      if names.contains(name) {
-        continue i + 1
-      } else {
-        break name
-      }
-    }
-  }
-}
 
 ///|
 fn readback_neutral(
-  env : VEnv,
-  menv : MetaEnv,
-  sig : Sig,
+  n_free_vars : Int,
   ntr : Neutral,
-  names : NameList
-) -> Expr!Failure {
+) -> Expr raise Failure {
   fn readback_spine(
     head : Expr,
     spine : Spine,
-    names : NameList
-  ) -> Expr!Failure {
+  ) -> Expr raise Failure {
     let mut app = head
-    for nf in spine {
-      match nf {
-        (nf, imp) => {
-          let arg = readback!(env, menv, sig, nf, names)
-          app = App(app, arg, imp)
+    for named_arg in spine {
+      match named_arg {
+        (v, h) => {
+          let arg = readback(n_free_vars, v)
+          app = App(app, arg, h)
         }
       }
     }
@@ -282,71 +218,30 @@ fn readback_neutral(
   }
 
   match ntr {
-    NeRigid(x, spine) => readback_spine!(Var(x), spine, names)
-    NeFlex(mv, spine) => readback_spine!(Meta(mv), spine, names)
-  }
-}
-
-///|
-pub fn readback_type(
-  env : VEnv,
-  menv : MetaEnv,
-  sig : Sig,
-  typ : TypeVal,
-  names : NameList
-) -> Expr!Failure {
-  match typ {
-    VSet(i) => Set(i)
-    VPi(imp, param_tyval, res_tyval) => {
-      let name = fresh_name(names)
-      let param_typ = readback_type!(env, menv, sig, param_tyval, names)
-      let param_ty_value = VNe(param_tyval, Neutral::var(name))
-      let return_typ = readback_type!(
-        env,
-        menv,
-        sig,
-        res_tyval!(param_ty_value),
-        names.add(name),
-      )
-      Pi(@abstract.TypedBinding((Some(name), imp, param_typ)), return_typ)
-    }
-    VNe(_, ntr) => readback_neutral!(env, menv, sig, ntr, names)
-    _ => fail!("\{typ} is not a type in 'readback_type'")
+    NeRigid(x, spine) => readback_spine(Var(@syntax.lvl2idx(n_free_vars, x)), spine)
+    NeFlex(mv, spine) => readback_spine(Meta(mv), spine)
   }
 }
 
 ///|
 pub fn readback(
-  env : VEnv,
-  menv : MetaEnv,
-  sig : Sig,
-  nf : Normal,
-  names : NameList
-) -> Expr!Failure {
-  match nf {
-    Nf(VPi(imp, a, b), f_value) => {
+  free_vars : Int,
+  value : Value,
+) -> Expr raise Failure {
+  match value {
+    VLam(x, h, t) => {
       // Functions
       // λx. t / neutral value
       // Generate a symbolic argument (neutral variable `x`)
       // to trigger the normalization of body `t`.
-      let x_name = fresh_name(names)
-      let x_val = VNe(a, Neutral::var(x_name))
-      let body_tyval = b!(x_val)
-      let body_val = eval_app!(env, menv, sig, f_value, x_val, imp)
-      // Wrap the body with lambda abstraction, i.e., η-expansion.
-      Lam(
-        x_name,
-        imp,
-        readback!(env, menv, sig, Nf(body_tyval, body_val), names.add(x_name)),
+      Lam(UntypedBinding((x, h)),
+        readback(free_vars + 1, t(VNe(Neutral::vvar(free_vars))))
       )
     }
-    Nf(VSet(_), value) => readback_type!(env, menv, sig, value, names)
-    Nf(nf_typ, VNe(ntr_typ, ntr)) => {
-      if not(types_equiv!(nf_typ, ntr_typ, names)) {
-        fail!("neutral type mismatch in readback: \{nf_typ} != \{ntr_typ}")
-      }
-      readback_neutral!(env, menv, sig, ntr, names)
+    VPi(x, h, a, b) => {
+      Pi(TypedBinding((x, h, readback(free_vars, a))), readback(free_vars + 1, b(VNe(Neutral::vvar(free_vars)))))
     }
-    _ => fail!("\{nf} is ill-typed normal form in 'readback'")
+    VSet(i) => Set(i)
+    VNe(ntr) => readback_neutral(free_vars, ntr)
   }
 }

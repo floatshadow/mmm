@@ -77,11 +77,10 @@ pub fn Sig::new() -> Sig {
 // unify two different rigid value raises an error;
 // unify a rigid and a flexible value solves meta variable.
 pub enum Neutral {
-  NeRigid(String, Spine) // local variable applied to spine, e.g., l [spine]
+  NeRigid(DBlvl, Spine) // local variable applied to spine, e.g., l [spine]
   NeFlex(MetaVar, Spine) // meta variable applied to spine, e.g., ?m [spine]
   NeCon(String, Spine) // c es
   NeDef(String, Spine) // delta/iota-redex f es
-  NeData(String, Spine) // D ps es
 } derive(Show)
 
 ///|
@@ -93,8 +92,8 @@ pub enum Value {
 } derive(Show)
 
 ///|
-pub fn Neutral::var(name : String) -> Neutral {
-  NeRigid(name, [])
+pub fn Neutral::vvar(lvl : Int) -> Neutral {
+  NeRigid(DBlvl(lvl), [])
 }
 
 ///|
@@ -110,9 +109,4 @@ pub fn Neutral::con(name : String) -> Neutral {
 ///|
 pub fn Neutral::def(name : String) -> Neutral {
   NeDef(name, [])
-}
-
-///|
-pub fn Neutral::data(name : String) -> Neutral {
-  NeData(name, [])
 }
