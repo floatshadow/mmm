@@ -1,19 +1,17 @@
-# RowMLTT
+# MLTT
 
-RowMLTT is a Agda-like, dependently typed toy language.
+MLTT is a Agda-like, dependently typed toy language.
 
 ## Features
 
-- [x] typed NbE for eta-equality
-- [ ] inductive data type and pattern matching
+- [x] inductive data type and pattern matching
 - [ ] holes and implicit arguments
 - [ ] dependent pattern matching
-- [ ] row polymorphism 
 
 ## References
 
 Indentation Sensitive Lexical Analysis:
-  - [Python 3 Documentation](https://docs.python.org/3/reference/lexical_analysis.html#indentation)
+  - [Agda](https://github.com/agda/agda/blob/master/src/full/Agda/Syntax/Parser/Layout.hs)
 
 Bidirectional Type Inference:
   - [Bidirectional Typing Rules: A Tutorial](https://davidchristiansen.dk/tutorials/bidirectional.pdf), Christiansen.
