@@ -1,7 +1,7 @@
 ///|
 typealias @immut/list.T as List
 
-/// Moonbit core has not transferred List::map to error polymorphic version yet.
+///| Moonbit core has not transferred List::map to error polymorphic version yet.
 fn[A, B] map_exn(xs : List[A], f : (A) -> B raise) -> List[B] raise {
   match xs {
     Nil => Nil
@@ -201,11 +201,12 @@ pub impl[A : Show] Show for List1[A] with output(xs, logger) {
   logger.write_iter(xs.iter(), prefix="@list.of([", suffix="])")
 }
 
-
+///|
 pub(all) enum List2[A] {
   Cons(A, A, List[A])
 } derive(Eq)
 
+///|
 pub fn[A, B] List2::map(self : List2[A], f : (A) -> B raise) -> List2[B] raise {
   match self {
     Cons(a1, a2, tl) => Cons(f(a1), f(a2), map_exn(tl, f))
@@ -238,6 +239,7 @@ pub fn[A] List2::to_array(self : List2[A]) -> Array[A] {
   }
 }
 
+///|
 pub fn[A] List2::iter(self : List2[A]) -> Iter[A] {
   self.to_list().iter()
 }

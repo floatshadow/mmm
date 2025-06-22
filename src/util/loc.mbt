@@ -1,4 +1,3 @@
-
 ///|
 pub(all) struct Loc {
   mut line : Int
