@@ -2,10 +2,10 @@
 typealias @abstract.MetaVar
 
 ///|
-typealias @abstract.Imp
+typealias @syntax.Hiding
 
 ///|
-typealias @abstract.Name
+typealias @syntax.Name
 
 ///|
 typealias @abstract.Clause
@@ -14,13 +14,13 @@ typealias @abstract.Clause
 typealias @abstract.Telescope
 
 ///|
-typealias Spine = Array[(Normal, Imp)]
+typealias Array[(Value, Hiding)] as Spine
 
 ///|
-typealias SpineView = ArrayView[(Normal, Imp)]
+typealias ArrayView[(Value, Hiding)] as SpineView
 
 ///|
-pub fn extend_spine(spine : Spine, nf : Normal, imp : Imp) -> Spine {
+pub fn extend_spine(spine : Spine, nf : Value, imp : Hiding) -> Spine {
   let spine2 = spine.copy()
   spine2.push((nf, imp))
   spine2
@@ -30,59 +30,66 @@ pub fn extend_spine(spine : Spine, nf : Normal, imp : Imp) -> Spine {
 typealias Value as TypeVal
 
 ///|
-typealias VEnv = @immut/list.T[(Name?, Value)]
+typealias @immut/list.T[(String, Value)] as VEnv
 
 ///|
-pub struct FunDef {
-  name : Name
+pub struct ConstantDef {
+  name : String
   ty : TypeVal
-  clauses : Array[Clause]
+  definitions : Array[Clause]?
 } derive(Show)
 
 ///|
 pub struct DataDef {
-  name : Name
+  name : String
   param : Telescope
   ty : TypeVal
 } derive(Show)
 
 ///|
 pub struct ConDef {
-  name : Name
-  data_name : Name
+  name : String
+  data_name : String
   ty : TypeVal
 } derive(Show)
 
 ///|
+typealias @immut/hashmap.T as Map
+
+///| Signature Σ
 pub struct Sig {
-  funs : @immut/hashmap.T[Name, FunDef]
-  datas : @immut/hashmap.T[Name, DataDef]
-  cons : @immut/hashmap.T[Name, ConDef]
+  constants : Map[String, ConstantDef]
+  datas : Map[String, DataDef]
+  cons : Map[String, ConDef]
 } derive(Show)
+
+///|
+pub fn Sig::new() -> Sig {
+  Sig::{
+    constants: @immut/hashmap.new(),
+    datas: @immut/hashmap.new(),
+    cons: @immut/hashmap.new(),
+  }
+}
 
 ///|
 // The name "rigid" comes from the fact that in unification.
 // unify two different rigid value raises an error;
 // unify a rigid and a flexible value solves meta variable.
 pub enum Neutral {
-  NeRigid(Name, Spine) // local variable applied to spine, e.g., l [spine]
+  NeRigid(String, Spine) // local variable applied to spine, e.g., l [spine]
   NeFlex(MetaVar, Spine) // meta variable applied to spine, e.g., ?m [spine]
-  NeCon(Name, Spine) // c es
-  NeDef(Name, Spine) // delta/iota-redex f es
-  NeData(Name, Spine) // D ps es
+  NeCon(String, Spine) // c es
+  NeDef(String, Spine) // delta/iota-redex f es
+  NeData(String, Spine) // D ps es
 } derive(Show)
 
 ///|
 pub enum Value {
-  VNe(TypeVal, Neutral) // neutral
+  VNe(Neutral) // neutral
   VSet(Int) // universe
-  VPi(Imp, Value, (Value) -> Value!Failure) // HOAS
-  VLam(Imp, (Value) -> Value!Failure) // HOAS
-} derive(Show)
-
-///|
-pub enum Normal {
-  Nf(TypeVal, Value)
+  VPi(String, Hiding, Value, (Value) -> Value raise Failure) // HOAS
+  VLam(String, Hiding, (Value) -> Value raise Failure) // HOAS
 } derive(Show)
 
 ///|
@@ -96,12 +103,12 @@ pub fn Neutral::meta(mv : MetaVar) -> Neutral {
 }
 
 ///|
-pub fn Neutral::con(name : Name) -> Neutral {
+pub fn Neutral::con(name : String) -> Neutral {
   NeCon(name, [])
 }
 
 ///|
-pub fn Neutral::def(name : Name) -> Neutral {
+pub fn Neutral::def(name : String) -> Neutral {
   NeDef(name, [])
 }
 
