@@ -1,5 +1,3 @@
-///|
-typealias NonEmptyList as List1
 
 ///|
 pub(all) struct Loc {

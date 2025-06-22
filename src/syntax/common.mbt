@@ -13,8 +13,13 @@ pub fn Name::new(range : Range, name : String) -> Name {
 }
 
 ///|
-pub fn Name::unname(self : String) -> Bool {
+pub fn Name::is_named(self : String) -> Bool {
   self == "_"
+}
+
+///|
+pub fn Name::to_raw_name(self : Name) -> String {
+  self.name
 }
 
 ///| Implicit attribute..

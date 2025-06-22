@@ -11,7 +11,13 @@ typealias @syntax.Hiding
 typealias @syntax.Bounding
 
 ///|
-pub(all) type TypedBinding (Name?, Hiding, Type)
+typealias @immut/list.T as List
+
+///|
+pub(all) type TypedBinding (String, Hiding, Type)
+
+///|
+pub(all) type UntypedBinding (String, Hiding)
 
 ///| (x : A) (y : B) (z : C) ... 
 pub typealias Array[TypedBinding] as Telescope
@@ -21,15 +27,14 @@ pub(all) type MetaVar Int derive(Eq, Hash)
 
 ///|
 pub(all) enum Expr {
-  Var(Name)
+  Var(String)
   Set(Int) // Set i
   Pi(TypedBinding, Type) // Π (x : A). B[x] or  Π {x : A}. B[x]
-  Lam(Name, Hiding, Expr) // λ x . t or λ {x} . t
+  Lam(UntypedBinding, Expr) // λ x . t or λ {x} . t
   App(Expr, Expr, Hiding) // t1 t2 or t1 {t2}
   Let((String, Type), Expr, Expr) // let x : A = t1 in t2
   Meta(MetaVar) // ?m
-  Hole
-  InsertedMeta(MetaVar, Array[Bounding]) // ?m [spine]
+  InsertedMeta(MetaVar, List[Bounding]) // ?m [spine]
   SrcPos(Loc, Expr) // debug
 } derive(Show)
 
@@ -38,14 +43,14 @@ pub typealias Expr as Type
 
 ///| p  ::=  x | c ps | .(e)
 pub(all) enum Pattern {
-  PVar(Name)
-  PCon(Name, Array[Pattern])
+  PVar(String)
+  PCon(String, Array[Pattern])
   PDot(Expr) // inaccessible pattern
 }
 
 ///| k  ::=  f ps = e
 pub(all) struct Clause {
-  lhs_head : Name
+  lhs_head : String
   lhs_pats : Array[Pattern]
   rhs : Expr
 }
@@ -78,8 +83,7 @@ pub fn MetaVar::to_string(self : MetaVar) -> String {
 ///|
 pub impl Show for TypedBinding with output(self, logger) {
   match self {
-    TypedBinding((None, _, ty)) => logger.write_object(ty.to_pretty())
-    TypedBinding((Some(name), imp, ty)) =>
+    TypedBinding((name, imp, ty)) =>
       match imp {
         Hiding => {
           logger.write_string("{\{name} : ")
@@ -91,6 +95,17 @@ pub impl Show for TypedBinding with output(self, logger) {
           logger.write_object(ty.to_pretty())
           logger.write_string(")")
         }
+      }
+  }
+}
+
+///|
+pub impl Show for UntypedBinding with output(self, logger) {
+  match self {
+    UntypedBinding((name, imp)) =>
+      match imp {
+        Hiding => logger.write_string("{\{name}}")
+        NotHiding => logger.write_string("\{name}")
       }
   }
 }
@@ -119,18 +134,12 @@ fn PrettyExpr::print_one_level(
   match syntax {
     Var(name) => logger.write_string("\{name}")
     Set(i) => logger.write_string("Set \{i}")
-    Pi(bind, return_ty) => {
-      logger.write_string("\{bind} ")
-      logger.write_string(" -> ")
+    Pi(tbind, return_ty) => {
+      logger.write_string("\{tbind} -> ")
       self.print_one_level(logger, return_ty)
     }
-    Lam(param_name, imp, body) => {
-      logger.write_string("λ ")
-      match imp {
-        Hiding => logger.write_string("{\{param_name}}")
-        NotHiding => logger.write_string("\{param_name}")
-      }
-      logger.write_string(". ")
+    Lam(utbind, body) => {
+      logger.write_string("λ \{utbind} . ")
       self.print_one_level(logger, body)
     }
     App(func, arg, imp) => {
@@ -166,7 +175,6 @@ fn PrettyExpr::print_one_level(
       logger.outdent()
     }
     Meta(mv) => logger.write_string("\{mv}")
-    Hole => logger.write_string("_")
     InsertedMeta(mv, spine) => {
       logger.write_string("\{mv} [")
       for bd in spine {

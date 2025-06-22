@@ -1,8 +1,12 @@
 ///|
+typealias @util.List2
+
+///| 
 fn raw_application(exprs : List1[Expr]) -> Expr {
   match exprs {
-    Cons(head, Nil) => head
-    _ as es => RawApp(es.get_range(), es.to_array())
+    Cons(e, Nil) => e
+    Cons(e1, Cons(e2, es1)) as es =>
+      RawApp(es.get_range(), List2::Cons(e1, e2, es1))
   }
 }
 

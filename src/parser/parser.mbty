@@ -11,7 +11,7 @@ typealias @util.Loc
 typealias @util.Interval
 typealias @util.Range
 traitalias @util.HasRange
-typealias @util.NonEmptyList as List1
+typealias @util.List1
 typealias @util.Either
 %}
 

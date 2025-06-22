@@ -5,7 +5,7 @@ typealias @hashmap.T[String, Keyword] as MutMap
 typealias @queue.T as Queue
 
 ///|
-typealias @util.NonEmptyList as List1
+typealias @util.List1
 
 ///|
 typealias @util.Loc

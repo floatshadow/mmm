@@ -20,13 +20,16 @@ pub(all) type MetaVar Int derive(Eq, Hash)
 typealias @util.Range
 
 ///|
+typealias @util.List2
+
+///|
 pub(all) enum Expr {
   Ident(Name)
   Set(Range, Int) // Set i
   Hole(Range) // underscore _
   Pi(TypedBinding, Type) // Π (x : A). B[x] or  Π {x : A}. B[x]
   Lam(UntypedBinding, Expr) // λ x . t or λ {x} . t
-  RawApp(Range, Array[Expr]) // t1 t2 ... tn
+  RawApp(Range, List2[Expr]) // t1 t2 ... tn
   HiddenArg(Range, Name?, Expr) // {e} or {x = e}
   Dot(Range, Expr) // .p, only in patterns
 }
@@ -37,7 +40,7 @@ pub typealias Expr as Type
 ///|
 pub(all) enum Pattern {
   PIdent(Name) // variable or constructor
-  PRawApp(Range, Array[Pattern]) // p p1 p2 ... pn
+  PRawApp(Range, List2[Pattern]) // p p1 p2 ... pn
   PHiddenArg(Range, Name?, Pattern) // {x} or {x = p}
   PWild(Range) // _ (wildcard pattern)
   PDot(Range, Expr) // inaccessible pattern .e
@@ -85,6 +88,17 @@ pub fn Expr::to_pattern(self : Expr) -> Pattern? {
 
   Some(go(self)) catch {
     _ => None
+  }
+}
+
+///|
+pub fn Expr::split_pi(self : Expr) -> (Telescope, Type) {
+  loop ([], self) {
+    (telescope, Pi(tbind, codomain)) => {
+      telescope.push(tbind)
+      continue (telescope, codomain)
+    }
+    (telescope, ty) => break (telescope, ty)
   }
 }
 
