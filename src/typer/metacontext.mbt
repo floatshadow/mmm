@@ -44,3 +44,15 @@ pub fn unsolved_metas() -> Array[(MetaVar, TypeVal)] {
   }
   unsolved
 }
+
+///|
+pub fn pretty_menv(logger : @util.IndentLogger) -> Unit {
+  logger.write_string("Θ = ")
+  for meta_info in metas {
+    let (mv, entry) = meta_info
+    match entry {
+      Solved(ty, val) => logger.write_string("\{mv} : \{ty} = \{val}, ")
+      Unsolved(ty) => logger.write_string("\{mv} : \{ty} (unsolved), ")
+    }
+  }
+}

@@ -2,58 +2,68 @@
 typealias @immut/list.T as List
 
 ///| σ : Ren Γ Δ
-/// Variable mapping from Γ to Δ in De Bruijn level.
+/// Variable mapping from Γ to Δ in de Bruijn level.
 pub struct Renaming {
-  domain : Int
-  codomain : Int
-  rename : List[Int] //  Γ ⊢ σ : Δ
+  dom : Int
+  codom : Int
+  // Γ ⊢ σ : Δ, mapping from variables in Δ to variables in Γ
+  ren : List[Int]
 }
 
 ///| ε : Ren Γ ∙
-pub fn Renaming::epsilon(domain : Int) -> Renaming {
-  Renaming::{ domain, codomain: 0, rename: Nil }
+pub fn Renaming::epsilon(dom : Int) -> Renaming {
+  Renaming::{ dom, codom: 0, ren: Nil }
 }
 
 ///| _,_ : (σ : Ren Γ Δ) → Var Γ (A[σ]) → Ren Γ (Δ, A)
-pub fn Renaming::extend(self : Renaming, var : Int) -> Renaming {
-  Renaming::{
-    domain: self.domain,
-    codomain: self.codomain + 1,
-    rename: self.rename.add(var),
-  }
+pub fn Renaming::extend(self : Renaming, lvl : Int) -> Renaming {
+  Renaming::{ dom: self.dom, codom: self.codom + 1, ren: self.ren.add(lvl) }
 }
 
 ///|
 pub struct Weaken {
-  domain : Int
-  codomain : Int
+  dom : Int
+  codom : Int
   weaken : List[Int]
 }
 
 ///| ε    : Sub ∙ ∙
 pub fn Weaken::epsilon() -> Weaken {
-  Weaken::{ domain: 0, codomain: 0, weaken: Nil }
+  Weaken::{ dom: 0, codom: 0, weaken: Nil }
 }
 
 ///| drop : Sub Γ Δ → Sub (Γ, A) Δ
 pub fn Weaken::drop(self : Weaken) -> Weaken {
-  Weaken::{
-    domain: self.domain + 1,
-    codomain: self.codomain,
-    weaken: self.weaken,
-  }
+  Weaken::{ dom: self.dom + 1, codom: self.codom, weaken: self.weaken }
 }
 
 ///| keep : (σ : Sub Γ Δ) → Sub (Γ, A[σ]) (Δ, A)
 pub fn Weaken::keep(self : Weaken) -> Weaken {
   Weaken::{
-    domain: self.domain + 1,
-    codomain: self.codomain + 1,
-    weaken: self.weaken.add(self.domain),
+    dom: self.dom + 1,
+    codom: self.codom + 1,
+    weaken: self.weaken.add(self.dom),
   }
 }
 
-/// inverse : (Δ : Context) → (spine : Subst Γ Δ) → Renaming Δ Γ
+///|
+pub struct PartialRenaming {
+  dom : Int
+  codom : Int
+  // Γ ⊢ σ : Δ, mapping from variables in Δ to variables in Γ
+  ren : Map[Int, Int]
+}
+
+///|
+pub fn PartialRenaming::lift(self : PartialRenaming) -> PartialRenaming {
+  PartialRenaming::{
+    dom: self.dom + 1,
+    codom: self.codom + 1,
+    ren: self.ren.add(self.codom, self.dom),
+  }
+}
+
+///| inverse : (Γ : Context) → (spine : Subst Δ Γ) → Renaming Γ Δ
 ///
 /// With pattern condition, the high-order unification problem
 ///   ?α spine =? rhs
@@ -62,7 +72,7 @@ pub fn Weaken::keep(self : Weaken) -> Weaken {
 /// We have the following unification problem
 ///   Γ is the current context where `rhs` lives;
 ///   Δ is the cotext where the body of meta solution of `?a` lives.
-///   Γ ⊢ ?α [spine] =? rhs
+///   Γ ⊢ ?α [spine] =? rhs : A
 /// where
 ///   Δ ⊢ ?α : A  (_closing type_ • ⊢ ?α : Δ ⇒ A in definition 2.3, by Kovacs)
 ///   spine : Subst Γ Δ
@@ -70,78 +80,188 @@ pub fn Weaken::keep(self : Weaken) -> Weaken {
 ///
 /// We turn `spine` into a renaming mapping from
 /// variables in `spine` under `Γ` to variables in solution `λ spine. rhs`
-// pub fn inverse(env : VEnv, menv : MetaEnv, sig : Sig,
-//    delta : Int,
-//    spine : SpineView) -> Renaming!Failure {
-//   let mut rename = Renaming::epsilon(delta)
-//   let mut used = NameList::Nil
-//   for arg in spine {
-//     let (Nf(_, v), imp) = arg
-//     match force_meta(env, menv, sig, v) {
-//       VNe(_, NeRigid(x, [])) if not(used.contains(x)) => {
-//         rename = rename.extend
-//       }
-
-//     }
-//   }
-//   rename
-// }
-
-///| Γ ⊢ ?α [spine] =? rhs
-fn solve(
+fn inverse(
   env : VEnv,
   sig : Sig,
-  names : NameList,
+  gamma : Int,
+  spine : SpineView
+) -> PartialRenaming raise Failure {
+  fn go(sp : SpineView) -> (Int, Map[Int, Int]) raise Failure {
+    match sp {
+      [] => (0, @immut/hashmap.new())
+      [.. vs, (v, _)] => {
+        let (delta, ren) = go(vs)
+        match force_meta(env, sig, v) {
+          VNe(NeRigid(lvl, [])) => {
+            let x = lvl.inner()
+            match ren.get(lvl.inner()) {
+              None => (delta + 1, ren.add(lvl.inner(), delta))
+              Some(_) =>
+                fail(
+                  "cannot invert spine \{spine}: variable of de Burijn level \{x} already in renaming",
+                )
+            }
+          }
+          v =>
+            fail(
+              "cannot invert spine \{spine}: expected a variable, but got \{v}",
+            )
+        }
+      }
+    }
+  }
+
+  let (delta, ren) = go(spine)
+  PartialRenaming::{ dom: delta, codom: gamma, ren }
+}
+
+///|
+fn rename(
+  mv : MetaVar,
+  pren : PartialRenaming,
+  rhs : Value
+) -> Expr raise Failure {
+  letrec go_spine = fn(
+    pren : PartialRenaming,
+    hd : Expr,
+    sp : SpineView
+  ) -> Expr raise Failure {
+    match sp {
+      [] => hd
+      [.. vs, (v, h)] => {
+        let t = go_spine(pren, hd, vs)
+        let u = go(pren, v)
+        App(t, u, h)
+      }
+    }
+  }
+  and go = fn(pren : PartialRenaming, v : Value) -> Expr raise Failure {
+    match v {
+      VNe(NeFlex(mv2, spine)) =>
+        if mv == mv2 {
+          fail("metavariable \{mv} appears in rhs \{rhs}")
+        } else {
+          go_spine(pren, Meta(mv2), spine)
+        }
+      VNe(NeRigid(lvl, sp)) => {
+        let x = lvl.inner()
+        match pren.ren.get(x) {
+          Some(x) => go_spine(pren, Var(@syntax.lvl2idx(pren.dom, x)), sp)
+          None =>
+            fail(
+              "In rhs \{rhs}, variable of de Burijn level \{x} not found in renaming",
+            )
+        }
+      }
+      VSet(i) => Set(i)
+      VPi(x, h, a, b) => {
+        let a = go(pren, a)
+        let b = go(pren.lift(), b(VNe(Neutral::vvar(pren.codom))))
+        Pi(TypedBinding((x, h, a)), b)
+      }
+      VLam(x, h, t) => {
+        let t = go(pren.lift(), t(VNe(Neutral::vvar(pren.codom))))
+        Lam(UntypedBinding((x, h)), t)
+      }
+    }
+  }
+
+  go(pren, rhs)
+}
+
+///| Γ ⊢ ?α [spine] =? rhs
+fn Typer::solve(
+  self : Typer,
+  env : VEnv,
+  sig : Sig,
+  lvl : Int,
   mv : MetaVar,
   spine : Spine,
   rhs : Value
 ) -> Unit raise Failure {
-  fail("not implemented: solve meta variable \{mv} with spine \{spine}")
+  self.tracer.log("\{lvl} ⊢ \{mv} [\{spine}] = \{rhs}")
+  let pren = inverse(env, sig, lvl, spine)
+  let rhs = rename(mv, pren, rhs)
+  let mut lam = rhs
+  for delta_lvl, arg in spine.iter2() {
+    let (_, h) = arg
+    lam = Lam(UntypedBinding(("x#\{delta_lvl}", h)), lam)
+  }
+  let meta_ty = match lookup_meta(mv) {
+    Some(MetaEntry::Unsolved(ty)) => ty
+    Some(MetaEntry::Solved(_)) => fail("meta variable \{mv} already solved!")
+    _ => fail("meta variable \{mv} not found in metacontext")
+  }
+  metas.set(mv, MetaEntry::Solved(meta_ty, VNe(Neutral::meta(mv))))
 }
 
 ///|
-fn unify(
+fn Typer::unify_spine(
+  self : Typer,
   env : VEnv,
   sig : Sig,
-  names : NameList,
+  lvl : Int,
+  sp1 : SpineView,
+  sp2 : SpineView
+) -> Unit raise Failure {
+  match (sp1, sp2) {
+    ([], []) => ()
+    ([.. vs1, (t1, h1)], [.. vs2, (t2, h2)]) => {
+      guard h1 == h2 else {
+        fail("cannot unify spine: (\{t1}, \{h1}) with (\{t2}, \{h2})")
+      }
+      self.unify_spine(env, sig, lvl, vs1, vs2)
+      self.unify(env, sig, lvl, t1, t2)
+    }
+  }
+}
+
+///|
+fn Typer::unify(
+  self : Typer,
+  env : VEnv,
+  sig : Sig,
+  lvl : Int,
   v1 : TypeVal,
   v2 : TypeVal
 ) -> Unit raise Failure {
   let v1 = force_meta(env, sig, v1)
   let v2 = force_meta(env, sig, v2)
+  self.tracer.log("unify \{v1} with \{v2} [ de Burijn level \{lvl}]")
+  fn bind_name(x1 : String, x2 : String) -> String {
+    x1 + "#" + x2
+  }
+
   match (v1, v2) {
     (VSet(u1), VSet(u2)) if u1 == u2 => ()
     (VLam(x1, h1, t1), VLam(x2, h2, t2)) if h1 == h2 => {
-      let fresh_x = @syntax.fresh_name(names)
-      let t1 = t1(VNe(Neutral::var(x1)))
-      let t2 = t2(VNe(Neutral::var(x2)))
-      let env2 = env.add((fresh_x, VNe(Neutral::var(fresh_x))))
-      unify(env2, sig, names.add(fresh_x), t1, t2)
+      let t1 = t1(VNe(Neutral::vvar(lvl)))
+      let t2 = t2(VNe(Neutral::vvar(lvl)))
+      let env2 = env.add((bind_name(x1, x2), VNe(Neutral::vvar(lvl))))
+      self.unify(env2, sig, lvl + 1, t1, t2)
     }
     (t1, VLam(x2, h2, t2)) => {
-      let fresh_x = @syntax.fresh_name(names)
-      let t1 = eval_app(env, sig, t1, VNe(Neutral::var(fresh_x)), h2)
-      let t2 = t2(VNe(Neutral::var(x2)))
-      let env2 = env.add((fresh_x, VNe(Neutral::var(fresh_x))))
-      unify(env2, sig, names.add(fresh_x), t1, t2)
+      let t1 = eval_app(env, sig, t1, VNe(Neutral::vvar(lvl)), h2)
+      let t2 = t2(VNe(Neutral::vvar(lvl)))
+      let env2 = env.add((x2, VNe(Neutral::vvar(lvl))))
+      self.unify(env2, sig, lvl + 1, t1, t2)
     }
     (VLam(x1, h1, t1), t2) => {
-      let fresh_x = @syntax.fresh_name(names)
-      let t1 = t1(VNe(Neutral::var(fresh_x)))
-      let t2 = eval_app(env, sig, t2, VNe(Neutral::var(fresh_x)), h1)
-      let env2 = env.add((fresh_x, VNe(Neutral::var(fresh_x))))
-      unify(env2, sig, names.add(fresh_x), t1, t2)
+      let t1 = t1(VNe(Neutral::vvar(lvl)))
+      let t2 = eval_app(env, sig, t2, VNe(Neutral::vvar(lvl)), h1)
+      let env2 = env.add((x1, VNe(Neutral::vvar(lvl))))
+      self.unify(env2, sig, lvl + 1, t1, t2)
     }
+    (VSet(i), VSet(j)) if i == j => ()
     (VPi(x1, h1, a1, b1), VPi(x2, h2, a2, b2)) if h1 == h2 => {
-      unify(env, sig, names, a1, a2)
-      let fresh_x = @syntax.fresh_name(names)
-      let b1 = b1(VNe(Neutral::var(fresh_x)))
-      let b2 = b2(VNe(Neutral::var(fresh_x)))
-      let env2 = env.add((fresh_x, VNe(Neutral::var(fresh_x))))
-      unify(env2, sig, names.add(fresh_x), b1, b2)
+      self.unify(env, sig, lvl, a1, a2)
+      let b1 = b1(VNe(Neutral::vvar(lvl)))
+      let b2 = b2(VNe(Neutral::vvar(lvl)))
+      let env2 = env.add((bind_name(x1, x2), VNe(Neutral::vvar(lvl))))
+      self.unify(env2, sig, lvl + 1, b1, b2)
     }
-    (VNe(NeFlex(mv, sp)), v) => solve(env, sig, names, mv, sp, v)
-    (v, VNe(NeFlex(mv, sp))) => solve(env, sig, names, mv, sp, v)
+    (VNe(NeFlex(mv, sp)), v) => self.solve(env, sig, lvl, mv, sp, v)
+    (v, VNe(NeFlex(mv, sp))) => self.solve(env, sig, lvl, mv, sp, v)
     _ => fail("unification failed: unify \{v1} with \{v2}")
   }
 }

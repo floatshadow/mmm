@@ -311,7 +311,6 @@ pub fn Declaration::to_pretty(self : Declaration) -> PrettyDecl {
 
 ///|
 fn PrettyDecl::print_one_level(
-  self : PrettyDecl,
   logger : @util.IndentLogger,
   decl : Declaration
 ) -> Unit {
@@ -320,7 +319,7 @@ fn PrettyDecl::print_one_level(
       logger.write_string("postulate\n")
       logger.indent()
       for d in ds {
-        self.print_one_level(logger, d)
+        PrettyDecl::print_one_level(logger, d)
         logger.write_string("\n")
       }
       logger.outdent()
@@ -335,7 +334,7 @@ fn PrettyDecl::print_one_level(
       logger.write_string(" where\n")
       logger.indent()
       for d in ds {
-        self.print_one_level(logger, d)
+        PrettyDecl::print_one_level(logger, d)
         logger.write_string("\n")
       }
       logger.outdent()
@@ -351,7 +350,7 @@ fn PrettyDecl::print_one_level(
           logger.indent()
           logger.write_string("where\n")
           for d in ds {
-            self.print_one_level(logger, d)
+            PrettyDecl::print_one_level(logger, d)
             logger.write_string("\n")
           }
           logger.outdent()
@@ -366,7 +365,7 @@ fn PrettyDecl::print_one_level(
       logger.write_string("mutual\n")
       logger.indent()
       for d in ds {
-        self.print_one_level(logger, d)
+        PrettyDecl::print_one_level(logger, d)
         logger.write_string("\n")
       }
       logger.outdent()
@@ -378,7 +377,7 @@ fn PrettyDecl::print_one_level(
 ///|
 pub impl Show for PrettyDecl with output(self, logger) {
   let logger = @util.IndentLogger::new(logger)
-  self.print_one_level(logger, self.decl)
+  PrettyDecl::print_one_level(logger, self.decl)
 }
 
 ///|
