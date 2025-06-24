@@ -1,223 +1,53 @@
 ///|
-typealias Syntax = @types.Syntax
+typealias @abstract.Expr
 
 ///|
-typealias Type = @types.Type
+typealias @abstract.Type
 
 ///|
-typealias TypeVal = Value
+typealias @syntax.Bounding
 
 ///|
-typealias VEnv = @immut/hashmap.T[String, Value]
-
-///|
-typealias NameMap = @immut/hashmap.T[String, String]
-
-///|
-typealias NameList = @immut/list.T[String]
-
-// Normalization by evaluation.
-// Substitution based normalization simply repeatedly applies β-reduction.
-// NbE does normalization in a way of interpreting the term.
-// Major problems in developing NbE:
-//  - Term may contains free variables, how to eval such open terms?
-//    f a -> (fun x -> ...) a, but f may get stuck (neutral form)
-//    Solution: we admit free variables as a value.
-//  - Admit free variables as value would ban further evaluations.
-//    f arg1 arg2 ... ->
-///|
-pub enum Neutral {
-  NeVar(String)
-  NeApp(Neutral, Normal)
-} derive(Show)
-
-///|
-pub enum Value {
-  VNe(TypeVal, Neutral) // Type for embedding expression into normal form
-  VSet(Int)
-  VPi(Value, (Value) -> Value!Failure) // HOAS
-  VLam((Value) -> Value!Failure)
-} derive(Show)
-
-///|
-pub enum Normal {
-  Nf(TypeVal, Value)
-} derive(Show)
-
-///|
-pub fn eval(env : VEnv, expr : Syntax) -> Value!Failure {
-  match expr {
-    Var(x) =>
-      match env.get(x) {
-        Some(v) => v
-        None => fail!("does not find \{x} in env when evaluation!")
-      }
-    Set(i) => VSet(i)
-    Pi(param_name, param_ty, return_ty) => {
-      let param_ty_value = eval!(env, param_ty)
-      fn return_ty_value(param_value) -> Value!Failure {
-        eval!(env.add(param_name, param_value), return_ty)
-      }
-
-      VPi(param_ty_value, return_ty_value)
-    }
-    Lam(param_name, body) => {
-      fn body_value(param_value) -> Value!Failure {
-        eval!(env.add(param_name, param_value), body)
-      }
-
-      VLam(body_value)
-    }
-    App(func, arg) => {
-      let f_value = eval!(env, func)
-      elim_lambda!(f_value, eval!(env, arg))
-    }
-    Let((x, _), e1, e2) => {
-      let e1_value = eval!(env, e1)
-      eval!(env.add(x, e1_value), e2)
-    }
-  }
-}
-
-// Reading back value to expressions.
-// Generate fresh name for normalization given used names.
-///|
-fn fresh_name(names : NameList) -> String {
-  loop 0 {
-    i => {
-      let name = "x\{i}"
-      if names.contains(name) {
-        continue i + 1
-      } else {
-        break name
-      }
-    }
-  }
-}
-
-// In typed NbE, each type can specify its own notion of equality, 
-// and thus the syntax of its normal forms. Therefore, reading back 
-// is now recursive on the structure of the type rather than 
-// the structure of the value.
-// 
-// Checking Dependent Types with Normalization by Evaluation: A Tutorial (Haskell Version)
-// David Thrane Christiansen (2019)
-///|
-pub fn elim_lambda(f_value : Value, arg_value : Value) -> Value!Failure {
-  match f_value {
-    VLam(f) => f!(arg_value)
-    VNe(VPi(a, b), ne) => {
-      let bx = b!(arg_value)
-      VNe(bx, NeApp(ne, Nf(a, arg_value)))
-    }
-    _ => fail!("not a function like value in 'elim_lambda'")
-  }
-}
-
-///|
-fn readback_neutral(ntr : Neutral, names : NameList) -> Syntax!Failure {
-  match ntr {
-    NeVar(x) => Var(x)
-    NeApp(f, arg) => {
-      let f = readback_neutral!(f, names)
-      let arg = readback!(arg, names)
-      App(f, arg)
-    }
-  }
-}
-
-///|
-pub fn readback_type(typ : TypeVal, names : NameList) -> Syntax!Failure {
-  match typ {
-    VSet(i) => Set(i)
-    VPi(param_ty_value, return_ty_func) => {
-      let name = fresh_name(names)
-      let param_typ = readback_type!(param_ty_value, names)
-      let param_ty_value = VNe(param_ty_value, NeVar(name))
-      let return_typ = readback_type!(
-        return_ty_func!(param_ty_value),
-        names.add(name),
-      )
-      Pi(name, param_typ, return_typ)
-    }
-    VNe(_, ntr) => readback_neutral!(ntr, names)
-    _ => fail!("\{typ} is not a type in 'readback_type'")
-  }
-}
-
-///|
-pub fn readback(nf : Normal, names : NameList) -> Syntax!Failure {
-  match nf {
-    Nf(VPi(a, b), f_value) => {
-      // Functions
-      // λx. t / neutral value
-      // Generate a symbolic argument (neutral variable `x`)
-      // to trigger the normalization of body `t`.
-      let x_name = fresh_name(names)
-      let x_value = VNe(a, NeVar(x_name))
-      let body_ty_value = b!(x_value)
-      let body_value = elim_lambda!(f_value, x_value)
-      // Wrap the body with lambda abstraction, i.e., η-expansion.
-      Lam(x_name, readback!(Nf(body_ty_value, body_value), names.add(x_name)))
-    }
-    Nf(VSet(_), value) => readback_type!(value, names)
-    Nf(nf_typ, VNe(ntr_typ, ntr)) => {
-      if not(types_equiv!(nf_typ, ntr_typ, names)) {
-        fail!("neutral type mismatch in readback: \{nf_typ} != \{ntr_typ}")
-      }
-      readback_neutral!(ntr, names)
-    }
-    _ => fail!("\{nf} is ill-typed normal form in 'readback'")
-  }
-}
-
-///|
-fn types_equiv(
-  value1 : TypeVal,
-  value2 : TypeVal,
-  names : NameList
-) -> Bool!Failure {
-  let expr1 = readback_type!(value1, names)
-  let expr2 = readback_type!(value2, names)
-  expr1 == expr2
-}
+typealias @syntax.DBlvl
 
 ///|
 pub struct TyCtx {
   values : VEnv
   typs : VEnv
-  names : NameList
+  sig : Sig
+  lvl : DBlvl
+  bounds : List[Bounding]
 }
 
 ///|
-pub fn TyCtx::empty() -> TyCtx {
-  TyCtx::{
-    values: @immut/hashmap.new(),
-    typs: @immut/hashmap.new(),
-    names: Nil,
-  }
+pub fn TyCtx::new() -> TyCtx {
+  TyCtx::{ values: Nil, typs: Nil, sig: Sig::new(), lvl: 0, bounds: Nil }
 }
 
 // Free variables comes from binding forms such as λx. t.
 // These free variables in Γ are neutral values 
 // since we don't know their values.
+
 ///|
 pub fn TyCtx::add_binding_var(
   self : TyCtx,
   name : String,
   typ : TypeVal
 ) -> TyCtx {
-  let value = VNe(typ, NeVar(name))
-  TyCtx::{
-    values: self.values.add(name, value),
-    typs: self.typs.add(name, typ),
-    names: self.names.add(name),
+  let value = VNe(Neutral::var(name))
+  {
+    ..self,
+    values: self.values.add((name, value)),
+    typs: self.typs.add((name, typ)),
+    lvl: DBlvl(self.lvl.inner() + 1),
+    bounds: self.bounds.add(Bounding::Bound),
   }
 }
 
 // Free variables comes from definitions such as let
 // In let binding, we would obtain the value of
 // variable in Γ, so we can use it as a value.
+
 ///|
 pub fn TyCtx::add_definition_var(
   self : TyCtx,
@@ -225,11 +55,18 @@ pub fn TyCtx::add_definition_var(
   value : Value,
   typ : TypeVal
 ) -> TyCtx {
-  TyCtx::{
-    values: self.values.add(name, value),
-    typs: self.typs.add(name, typ),
-    names: self.names.add(name),
+  {
+    ..self,
+    values: self.values.add((name, value)),
+    typs: self.typs.add((name, typ)),
+    lvl: DBlvl(self.lvl.inner() + 1),
+    bounds: self.bounds.add(Bounding::Defined),
   }
+}
+
+///|
+pub fn TyCtx::boundings(self : TyCtx) -> List[Bounding] {
+  self.bounds
 }
 
 // Bidirectional type checking:
@@ -249,125 +86,324 @@ pub fn TyCtx::add_definition_var(
 // Γ |- e => A   Γ |- A ≡ B
 // ------------------------ (T-Conv)
 // Γ |- e <= B
+//
+// The implicit argument insertion is based on section 2.6 of 
+// Elaboration with first-class implicit function types.
 
-///|
-fn check_expr_is_type(ctx : TyCtx, expr : Syntax) -> Int!Failure {
-  match infer!(ctx, expr) {
-    VSet(i) => i
-    _ => fail!("\{expr} is not a type universe")
+///| Insert fresh implicit applications to an expr
+/// which is not a implicit lambda.
+///   insert λ{x}. t  _                ->  λ{x}. t
+///   insert t        Π {x : A}. B[x]  ->  t {u}
+fn insert_implicit_app(
+  ctx : TyCtx,
+  hiding_lam : (Expr, TypeVal)
+) -> (Expr, TypeVal) raise Failure {
+  fn go(t : Expr, a : TypeVal) -> (Expr, TypeVal) raise Failure {
+    match a {
+      VPi(_, Hiding, _, b) => {
+        let m = fresh_meta(ctx)
+        let mv = eval(ctx.values, ctx.sig, m)
+        go(App(t, m, Hiding), b(mv))
+      }
+      _ => (t, a)
+    }
+  }
+
+  match hiding_lam {
+    (Lam(UntypedBinding((_, Hiding)), _) as t, ty) => (t, ty)
+    (t, a) => go(t, a)
   }
 }
 
 ///|
-pub fn check(ctx : TyCtx, expr : Syntax, typ : TypeVal) -> Unit!Failure {
+pub struct Typer {
+  tracer : @util.SubTracer
+}
+
+///|
+pub fn Typer::new(tracer : @util.SubTracer) -> Typer {
+  Typer::{ tracer, }
+}
+
+///|
+fn Typer::check_expr_is_type(
+  self : Typer,
+  ctx : TyCtx,
+  expr : @concrete.Expr
+) -> (Expr, Int) raise Failure {
+  match self.infer(ctx, expr) {
+    (t, VSet(i)) => (t, i)
+    _ => fail("\{expr.to_pretty()} is not a type")
+  }
+}
+
+///|
+pub fn Typer::check(
+  self : Typer,
+  ctx : TyCtx,
+  expr : @concrete.Expr,
+  typ : TypeVal
+) -> Expr raise Failure {
   // println("check \{expr} <= \{typ}")
-  match expr {
+  match (expr, typ) {
     // A ~> (x : B) -> C[x]   Γ, x : B |- e : C[x] ~ t
     // ------------------------------------------
     // Γ |- λx. e <= A ~ λx. t
-    Lam(param_name, body) =>
-      match typ {
-        VPi(a, b) => {
-          let neutral_param_value = VNe(a, NeVar(param_name))
-          let ctx2 = ctx.add_definition_var(param_name, neutral_param_value, a)
-          let expected_return_ty = b!(neutral_param_value)
-          check!(ctx2, body, expected_return_ty)
-        }
-        _ => fail!("\{typ} is not a dependent function type")
-      }
-    Let((x, x_typ), e1, e2) => {
-      let _ = check_expr_is_type!(ctx, x_typ)
-      let x_typ_value = eval!(ctx.values, x_typ)
-      let _ = check!(ctx, e1, x_typ_value)
-      let e1_value = eval!(ctx.values, e1)
-      let ctx2 = ctx.add_definition_var(x, e1_value, x_typ_value)
-      check!(ctx2, e2, typ)
+    // If the Hiding info of the lambda matches the Pi type
+    (Lam(UntypedBinding((_, x, h1)), t), VPi(_, h2, a, b)) if h1 == h2 => {
+      let x = x.to_raw_name()
+      let ctx2 = ctx.add_binding_var(x, a)
+      let x_val = VNe(Neutral::vvar(x))
+      let expected_b = b(x_val)
+      let t = self.check(ctx2, t, expected_b)
+      Lam(UntypedBinding((x, h1)), t)
     }
+    // Otherwise if Pi is hiding, insert a new implicit lambda
+    (t, VPi(x, Hiding, a, b)) => {
+      let ctx2 = ctx.add_binding_var(x, a)
+      let x_val = VNe(Neutral::vvar(x))
+      let t = self.check(ctx2, t, b(x_val))
+      Lam(UntypedBinding((x, Hiding)), t)
+    }
+    // (Let((x, x_ty), e1, e2), a) => {
+    //   let (x_ty, _) = self.check_expr_is_type(ctx, x_ty)
+    //   let x_tyval = eval(ctx.values, ctx.sig, x_ty)
+    //   let e1 = self.check(ctx, e1, x_tyval)
+    //   let e1_val = eval(ctx.values, ctx.sig, e1)
+    //   let ctx2 = ctx.add_definition_var(x, e1_val, x_tyval)
+    //   let u = self.check(ctx2, e2, typ)
+    //   Let((x, x_ty), e1, u)
+    // }
     // Γ |- e => B  A = B
     // -------------------
     // Γ |- e <= A
-    _ => {
-      let infer_ty_value = infer!(ctx, expr)
+    (t, expected_tyval) => {
+      let (t, infer_tyval) = self.infer(ctx, expr)
       // check if inferred type is equal to given type
-      if not(types_equiv!(infer_ty_value, typ, ctx.names)) {
-        fail!("expected \{expr} : \{infer_ty_value}, but got \{typ}")
-      }
+      unify(ctx.values, ctx.sig, ctx.names, infer_tyval, expected_tyval)
+      t
     }
   }
 }
 
 ///|
-pub fn infer(ctx : TyCtx, expr : Syntax) -> TypeVal!Failure {
-  // println("infer \{expr}")
-  let typ_val = match expr {
+fn Typer::infer_app(
+  self : Typer,
+  ctx : TyCtx,
+  t : @concrete.Expr,
+  u : @concrete.Expr
+) -> (Expr, TypeVal) raise Failure {
+  let (f, f_tyval) = self.infer(ctx, f)
+  match f_tyval {
+    VPi(_, _, param_ty_value, return_ty_func) => {
+      // check the argument type
+      self.check(ctx, arg, param_ty_value)
+      // return the function type applied to the argument
+      (App(f, arg, h), return_ty_func(eval(ctx.values, ctx.sig, arg)))
+    }
+    _ => fail("\{f} is not of (dependent) function type")
+  }
+}
+
+///|
+pub fn Typer::infer(
+  self : Typer,
+  ctx : TyCtx,
+  expr : @concrete.Expr
+) -> (Expr, TypeVal) raise Failure {
+  self.tracer.log("infer \{expr.to_pretty()}")
+  let (expr, tyval) = match expr {
     // (x : A) ∈ Γ
     // ------------
     // Γ |- x => A
-    Var(x) =>
-      match ctx.typs.get(x) {
-        Some(typ) => typ
-        None => fail!("does not find \{x} in env when inference!")
+    Ident(x) => {
+      let x = x.to_raw_name()
+      // de burijn index
+      fn go(index : Int, types : VEnv) -> Option[(Int, TypeVal)] {
+        match types {
+          Cons((y, v), tl) => {
+            if (x == y) {
+              Some((index, v))
+            } else {
+              go(index + 1, tl)
+            }
+          }
+          Nil => None
+        }
       }
+      match go(0, ctx.typs) {
+        Some(it) => it
+        None =>
+          match ctx.sig.constants.get(x) {
+            Some(f) => (Def(x), f.ty)
+            None =>
+              match ctx.sig.cons.get(x) {
+                Some(c) => (Con(x), c.ty)
+                None => fail("does not find \{x} in env when evaluation!")
+              }
+          }
+      }
+    }
     // -------------------------
     // Γ |- Set i => Set (i + 1)
-    Set(i) => VSet(i + 1)
+    Set(_, i) => (Set(i), VSet(i + 1))
     // Γ |- e1 => A -> B  Γ, x : A |- e2 <= A
     // ---------------------------------------
     // Γ |- e1 e2 => B[x |-> t]
-    App(f, arg) => {
-      let infer_f_ty = infer!(ctx, f)
-      match infer_f_ty {
-        VPi(param_ty_value, return_ty_func) => {
-          check!(ctx, arg, param_ty_value)
-          return_ty_func!(eval!(ctx.values, arg))
-        }
-        _ => fail!("\{f} is not of (dependent) function type")
-      }
+    // App(f, arg) => {
+    //   let infer_f_ty = infer(ctx, f)
+    //   match infer_f_ty {
+    //     VPi(param_ty_value, return_ty_func) => {
+    //       check(ctx, arg, param_ty_value)
+    //       return_ty_func(eval(ctx.values, arg))
+    //     }
+    //     _ => fail("\{f} is not of (dependent) function type")
+    //   }
+    // }
+    HiddenArg(_) => fail("hidden argument should not be inferred individually!")
+    RawApp(_, Cons(f, e1, es)) => {
+      loop ()
+
     }
-    Lam(_) => fail!("unable to infer a lambda term")
+    Lam(UntypedBinding((_, x, h)), t) => {
+      // \ x : ?m .t
+      let a = eval(ctx.values, ctx.sig, fresh_meta(ctx))
+      let x = x.to_raw_name()
+      let ctx2 = ctx.add_binding_var(x, a)
+      let (t, b) = self.infer(ctx2, t)
+      let (t, b) = insert_implicit_app(ctx2, (t, b))
+      fn b_tyval(a : TypeVal) -> TypeVal raise Failure {
+        let env2 = ctx.values.add((x, a))
+        let b = readback_type(env2, ctx.sig, b)
+        eval(ctx.values.add((x, a)), ctx.sig, b)
+      }
+
+      (Lam(UntypedBinding((x, h)), t), VPi(x, h, a, b_tyval))
+    }
     // Γ |- A => Set i  Γ, x : A |- B[x] => Set j
     // -----------------------------------------
     // Γ |- Π (x : A). B[x] => Set (max(i, j))
-    Pi(param_name, param_ty, return_ty) => {
-      // println("infer Pi \{param_name} : \{param_ty} => \{return_ty}")
-      let param_universe = check_expr_is_type!(ctx, param_ty)
-      let param_ty_value = eval!(ctx.values, param_ty)
-      let ctx2 = ctx.add_binding_var(param_name, param_ty_value)
-      let return_universe = check_expr_is_type!(ctx2, return_ty)
-      VSet(@math.maximum(param_universe, return_universe))
+    Pi(TypedBinding((_, x, h, a)), b) => {
+      let x = x.to_raw_name()
+      let (a, a_univ) = self.check_expr_is_type(ctx, a)
+      let a_tyval = eval(ctx.values, ctx.sig, a)
+      let ctx2 = ctx.add_binding_var(x, a_tyval)
+      let (b, b_univ) = self.check_expr_is_type(ctx2, b)
+      (Pi(TypedBinding((x, h, a)), b), VSet(@math.maximum(a_univ, b_univ)))
     }
+    Hole(_) => {
+      let a = eval(ctx.values, ctx.sig, fresh_meta(ctx))
+      let t = fresh_meta(ctx)
+      (t, a)
+    }
+    Dot(_) => fail("dot expression should not be used in expression!")
     // Γ |- e1 <= A  Γ, x : A |- e2 => B
     // ----------------------------------
     // Γ |- let x : A = e1 in e2 => B
-    Let((x, x_typ), e1, e2) => {
-      let _ = check_expr_is_type!(ctx, x_typ)
-      let x_typ_value = eval!(ctx.values, x_typ)
-      // println("let \{x}: \{x_typ_value}")
-      let _ = check!(ctx, e1, x_typ_value)
-      let e1_value = eval!(ctx.values, e1)
-      // println("let \{x} = \{e1_value}")
-      let ctx2 = ctx.add_definition_var(x, e1_value, x_typ_value)
-      infer!(ctx2, e2)
-    }
+    // Let((x, x_typ), e1, e2) => {
+    //   let _ = check_expr_is_type(ctx, x_typ)
+    //   let x_typ_value = eval(ctx.values, x_typ)
+    //   // println("let \{x}: \{x_typ_value}")
+    //   let _ = check(ctx, e1, x_typ_value)
+    //   let e1_value = eval(ctx.values, e1)
+    //   // println("let \{x} = \{e1_value}")
+    //   let ctx2 = ctx.add_definition_var(x, e1_value, x_typ_value)
+    //   infer(ctx2, e2)
+    // }
   }
-  // println("inferred \{expr} => \{typ_val}")
-  typ_val
+  self.tracer.log("infer \{expr.to_pretty()} => \{tyval}")
+  (expr, tyval)
 }
 
 ///|
-pub fn alpha_equiv(maps : NameMap, expr1 : Syntax, expr2 : Syntax) -> Bool {
-  match (expr1, expr2) {
-    (Var(name1), Var(name2)) =>
-      match maps.get(name1) {
-        Some(n) => n == name2
-        None => name1 == name2
+fn TyCtx::add_axiom(self : TyCtx, name : String, ty : TypeVal) -> TyCtx {
+  let axiom = ConstantDef::{ name, ty, definitions: None }
+  {
+    ..self,
+    sig: { ..self.sig, constants: self.sig.constants.add(name, axiom) },
+  }
+}
+
+///|
+fn Typer::axiom_check(
+  self : Typer,
+  ctx : TyCtx,
+  name : Name,
+  ty : @concrete.Expr
+) -> TyCtx raise Failure {
+  let name = name.to_raw_name()
+  let (ty, _) = self.check_expr_is_type(ctx, ty)
+  let tyval = eval(ctx.values, ctx.sig, ty)
+  ctx.add_axiom(name, tyval)
+}
+
+///|
+fn Typer::data_check(
+  self : Typer,
+  ctx : TyCtx,
+  name : Name,
+  param : @concrete.Telescope,
+  ty : @concrete.Expr,
+  cons : Array[@concrete.Declaration]
+) -> TyCtx raise Failure {
+  // data
+  let data_ty = @concrete.Expr::telescope_pi(param, ty)
+  // constructors
+  for con in cons {
+    match con {
+      TypeSig(x, ty) => {
+        let (ty, _) = self.check_expr_is_type(ctx, ty)
+        let tyval = eval(ctx.values, ctx.sig, ty)
+        ctx = ctx.add_axiom(x.to_raw_name(), tyval)
       }
+      _ => fail("constructor declaration not implemented yet")
+    }
+  }
+  fail("data check not implemented yet")
+}
+
+///|
+fn Typer::check_declarations(
+  self : Typer,
+  ctx : TyCtx,
+  decls : Array[@concrete.Declaration]
+) -> Unit raise Failure {
+  let checked_decls = []
+  let mut ctx2 = ctx
+  for decl in decls {
+    self.tracer.log("check declaration")
+    self.tracer.log(decl.to_pretty())
+    let checked_decl = match decl {
+      TypeSig(x, ty) => ctx2 = self.axiom_check(ctx2, x, ty)
+      DataDef(_, d, telescope, ty, cons) =>
+        ctx2 = self.data_check(ctx2, d, telescope, ty, cons)
+      FunClause(_) => ...
+      Mutual(_) | Postulate(_) | Command(_) => fail("not implemented yet")
+    }
+    checked_decls.push(checked_decl)
+  }
+}
+
+///|
+pub fn Typer::check_program(
+  self : Typer,
+  program : Array[@concrete.Declaration]
+) -> Unit raise Failure {
+  let ctx = TyCtx::new()
+  self.check_declarations(ctx, program)
+}
+
+///|
+pub fn alpha_equiv(e1 : Expr, e2 : Expr) -> Bool {
+  match (e1, e2) {
+    (Var(i1), Var(i2)) => i1 == i2
     (Set(u1), Set(u2)) => u1 == u2
-    (Pi(n1, p1, r1), Pi(n2, p2, r2)) =>
-      alpha_equiv(maps, p1, p2) && alpha_equiv(maps.add(n1, n2), r1, r2)
-    (Lam(n1, b1), Lam(n2, b2)) => alpha_equiv(maps.add(n1, n2), b1, b2)
-    (App(f1, a1), App(f2, a2)) =>
-      alpha_equiv(maps, f1, f2) && alpha_equiv(maps, a1, a2)
+    (Pi(TypedBinding((_, h1, a1)), b1), Pi(TypedBinding((_, h2, a2)), b2)) if h1 ==
+      h2 => alpha_equiv(a1, a2) && alpha_equiv(b1, b2)
+    (Lam(UntypedBinding((_, h1)), t1), Lam(UntypedBinding((_, h2)), t2)) if h1 ==
+      h2 => alpha_equiv(t1, t2)
+    (App(f1, a1, h1), App(f2, a2, h2)) if h1 == h2 =>
+      alpha_equiv(f1, f2) && alpha_equiv(a1, a2)
     _ => false
   }
 }
