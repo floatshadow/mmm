@@ -136,7 +136,7 @@ fn PrettyExpr::print_one_level(
     Con(c) => logger.write_string("\{c}")
     Set(i) => logger.write_string("Set \{i}")
     Pi(tbind, return_ty) => {
-      logger.write_string("\{tbind} -> ")
+      logger.write_string("\{tbind} → ")
       PrettyExpr::print_one_level(logger, return_ty)
     }
     Lam(utbind, body) => {

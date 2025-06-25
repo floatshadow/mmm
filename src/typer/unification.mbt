@@ -153,6 +153,8 @@ fn rename(
             )
         }
       }
+      VNe(NeCon(name, sp)) => go_spine(pren, Con(name), sp)
+      VNe(NeDef(name, sp)) => go_spine(pren, Def(name), sp)
       VSet(i) => Set(i)
       VPi(x, h, a, b) => {
         let a = go(pren, a)
@@ -213,6 +215,7 @@ fn Typer::unify_spine(
       self.unify_spine(env, sig, lvl, vs1, vs2)
       self.unify(env, sig, lvl, t1, t2)
     }
+    _ => fail("cannot unify spine: \{sp1} with \{sp2}")
   }
 }
 
@@ -225,7 +228,7 @@ fn Typer::unify(
   v1 : TypeVal,
   v2 : TypeVal
 ) -> Unit raise Failure {
-  self.tracer.log("unify \{v1} with \{v2} [ de Burijn level \{lvl}]")
+  self.tracer.log("unify \{v1} with \{v2} [\{@syntax.DBlvl(lvl)}]")
   let v1 = force_meta(env, sig, v1)
   let v2 = force_meta(env, sig, v2)
   fn bind_name(x1 : String, x2 : String) -> String {
@@ -262,6 +265,12 @@ fn Typer::unify(
     }
     (VNe(NeFlex(mv, sp)), v) => self.solve(env, sig, lvl, mv, sp, v)
     (v, VNe(NeFlex(mv, sp))) => self.solve(env, sig, lvl, mv, sp, v)
+    (VNe(NeRigid(lvl1, sp1)), VNe(NeRigid(lvl2, sp2))) if lvl1 == lvl2 =>
+      self.unify_spine(env, sig, lvl, sp1, sp2)
+    (VNe(NeCon(c1, sp1)), VNe(NeCon(c2, sp2))) if c1 == c2 =>
+      self.unify_spine(env, sig, lvl, sp1, sp2)
+    (VNe(NeDef(d1, sp1)), VNe(NeDef(d2, sp2))) if d1 == d2 =>
+      self.unify_spine(env, sig, lvl, sp1, sp2)
     _ => fail("unification failed: unify \{v1} with \{v2}")
   }
 }
@@ -278,7 +287,7 @@ fn Typer::unify_err(
   let t1 = readback(lvl, v1)
   let t2 = readback(lvl, v2)
   self.tracer.log(
-    "unify \{t1.to_pretty()} with \{t2.to_pretty()} [ de Burijn level \{lvl}]",
+    "\{t1.to_pretty()} =? \{t2.to_pretty()} [\{@syntax.DBlvl(lvl)}]",
   )
   self.unify(env, sig, lvl, v1, v2)
 }

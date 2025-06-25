@@ -295,7 +295,7 @@ pub fn Lexer::next_err(self : Lexer) -> (Token, Interval) raise Failure {
   match self.tokenbuf.pop() {
     Some((tok, _) as spaned_token) =>
       match tok {
-        ErrorMsg((_, msg)) => fail(msg)
+        ErrorMsg((loc, msg)) => fail("at \{loc}, \{msg}")
         _ => spaned_token
       }
     None => {
@@ -380,7 +380,7 @@ fn Lexer::peek_last_token(self : Lexer) -> Token? {
 }
 
 ///|
-fn Lexer::is_layout_keyword(self : Lexer, tok : Token) -> Bool {
+fn Lexer::is_layout_keyword(tok : Token) -> Bool {
   match tok {
     Token::KwWhere(_) | Token::KwPostulate(_) | Token::KwMutual(_) => true
     _ => false
@@ -413,7 +413,7 @@ fn Lexer::lex(self : Lexer) -> Unit {
           self.index += 1
           self.move_to_newline()
           match self.peek_last_token() {
-            Some(tok) if self.is_layout_keyword(tok) => {
+            Some(tok) if Lexer::is_layout_keyword(tok) => {
               let bol = self.get_loc()
               if self.indent_level(bol) is Some(indent) {
                 let eoi = self.get_loc()

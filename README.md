@@ -39,3 +39,4 @@ Codebases:
   - [minimal MLTT implementation step-by-step](https://gist.github.com/Guest0x0/e94d30077519ff9c64d6317035833461), Guest0x0.
   - [elaboration-zoon](https://github.com/AndrasKovacs/elaboration-zoo), Kovács.
   - [ShiTT](https://github.com/KonjacSource/ShiTT), KonjacSource.
+  - [Mini Moonbit Machine](https://github.com/Mini-Moonbit-Machine/mmm), waterlens and flaotshadow.

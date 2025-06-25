@@ -77,6 +77,12 @@ fn main {
         (tok, { start, end }) => tokens.push((tok, start, end))
       }
     }
+    // for spanned_tokens in tokens {
+    //   let (tok, _, _) = spanned_tokens
+    //   println(
+    //     "\{tok}"
+    //   )
+    // }
     // parser
     let subtracer = tracer.new_subtracer(
       "parser",
@@ -86,6 +92,14 @@ fn main {
     let concrete_syntax = @parser.parse_file(tokens)
     subtracer.log("parsed \{file} successfully")
     subtracer.log("\{@concrete.PrettyDecls::new(concrete_syntax)}")
+    // typer
+    let subtracer = tracer.new_subtracer(
+      "typer",
+      opts.output_to_console,
+      opts.redirect_to_log,
+    )
+    let typer = @typer.Typer::new(subtracer)
+    typer.check_program(concrete_syntax)
   } catch {
     Failure(msg) => println("\{msg}")
     _ as err => println("\{err}")

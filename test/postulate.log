@@ -1,0 +1,200 @@
+// [typer] check declaration
+// [typer] postulate
+  N : Set 0
+  z : N
+  s : (_ : N) → N
+  Eq : (A : Set 0) → (_ : A) → (_ : A) → Set 0
+  refl : (A : Set 0) → (a : A) → (Eq) (A) (a) (a) 
+  extensionality : (A : Set 0) → (B : Set 0) → (f : (_ : A) → B) → (g : (_ : A) → B) → (_ : (x : A) → (Eq) (B) ((f) (x) ) ((g) (x) ) ) → (Eq) ((_ : A) → B) (f) (g) 
+
+// [typer] check declaration in postulate
+// [typer] N : Set 0
+// [typer] infer  ⊢ Set 0
+// [typer] infer  ⊢ Set 0 ⇒ Set 1
+// [typer] axiom N : VSet(0)
+// [typer] check declaration in postulate
+// [typer] z : N
+// [typer] infer  ⊢ N
+// [typer] infer  ⊢ N ⇒ Set 0
+// [typer] axiom z : VNe(NeDef("N", []))
+// [typer] check declaration in postulate
+// [typer] s : (_ : N) → N
+// [typer] infer  ⊢ (_ : N) → N
+// [typer] infer  ⊢ N
+// [typer] infer  ⊢ N ⇒ Set 0
+// [typer] infer _ : N,  ⊢ N
+// [typer] infer _ : N,  ⊢ N ⇒ Set 0
+// [typer] infer  ⊢ (_ : N) → N ⇒ Set 0
+// [typer] axiom s : VPi("_", NotHiding, VNe(NeDef("N", [])), <function>)
+// [typer] check declaration in postulate
+// [typer] Eq : (A : Set 0) → (_ : A) → (_ : A) → Set 0
+// [typer] infer  ⊢ (A : Set 0) → (_ : A) → (_ : A) → Set 0
+// [typer] infer  ⊢ Set 0
+// [typer] infer  ⊢ Set 0 ⇒ Set 1
+// [typer] infer A : Set 0,  ⊢ (_ : A) → (_ : A) → Set 0
+// [typer] infer A : Set 0,  ⊢ A
+// [typer] infer A : Set 0,  ⊢ #0 ⇒ Set 0
+// [typer] infer A : Set 0, _ : #0,  ⊢ (_ : A) → Set 0
+// [typer] infer A : Set 0, _ : #0,  ⊢ A
+// [typer] infer A : Set 0, _ : #0,  ⊢ #1 ⇒ Set 0
+// [typer] infer A : Set 0, _ : #0, _ : #1,  ⊢ Set 0
+// [typer] infer A : Set 0, _ : #0, _ : #1,  ⊢ Set 0 ⇒ Set 1
+// [typer] infer A : Set 0, _ : #0,  ⊢ (_ : #1) → Set 0 ⇒ Set 1
+// [typer] infer A : Set 0,  ⊢ (_ : #0) → (_ : #1) → Set 0 ⇒ Set 1
+// [typer] infer  ⊢ (A : Set 0) → (_ : #0) → (_ : #1) → Set 0 ⇒ Set 1
+// [typer] axiom Eq : VPi("A", NotHiding, VSet(0), <function>)
+// [typer] check declaration in postulate
+// [typer] refl : (A : Set 0) → (a : A) → (Eq) (A) (a) (a) 
+// [typer] infer  ⊢ (A : Set 0) → (a : A) → (Eq) (A) (a) (a) 
+// [typer] infer  ⊢ Set 0
+// [typer] infer  ⊢ Set 0 ⇒ Set 1
+// [typer] infer A : Set 0,  ⊢ (a : A) → (Eq) (A) (a) (a) 
+// [typer] infer A : Set 0,  ⊢ A
+// [typer] infer A : Set 0,  ⊢ #0 ⇒ Set 0
+// [typer] infer A : Set 0, a : #0,  ⊢ (Eq) (A) (a) (a) 
+// [typer] infer A : Set 0, a : #0,  ⊢ (((Eq) (A)) (a)) (a)
+// [typer] infer A : Set 0, a : #0,  ⊢ ((Eq) (A)) (a)
+// [typer] infer A : Set 0, a : #0,  ⊢ (Eq) (A)
+// [typer] infer A : Set 0, a : #0,  ⊢ Eq
+// [typer] infer A : Set 0, a : #0,  ⊢ Eq ⇒ (A : Set 0) → (_ : #0) → (_ : #1) → Set 0
+// [typer] check A ⇐ Set 0
+// [typer] infer A : Set 0, a : #0,  ⊢ A
+// [typer] infer A : Set 0, a : #0,  ⊢ #1 ⇒ Set 0
+// [typer] Set 0 =? Set 0 [ℓ2]
+// [typer] unify VSet(0) with VSet(0) [ℓ2]
+// [typer] infer A : Set 0, a : #0,  ⊢ Eq #1 ⇒ (_ : #1) → (_ : #2) → Set 0
+// [typer] check a ⇐ #1
+// [typer] infer A : Set 0, a : #0,  ⊢ a
+// [typer] infer A : Set 0, a : #0,  ⊢ #0 ⇒ #1
+// [typer] #1 =? #1 [ℓ2]
+// [typer] unify VNe(NeRigid(ℓ0, [])) with VNe(NeRigid(ℓ0, [])) [ℓ2]
+// [typer] infer A : Set 0, a : #0,  ⊢ Eq #1 #0 ⇒ (_ : #1) → Set 0
+// [typer] check a ⇐ #1
+// [typer] infer A : Set 0, a : #0,  ⊢ a
+// [typer] infer A : Set 0, a : #0,  ⊢ #0 ⇒ #1
+// [typer] #1 =? #1 [ℓ2]
+// [typer] unify VNe(NeRigid(ℓ0, [])) with VNe(NeRigid(ℓ0, [])) [ℓ2]
+// [typer] infer A : Set 0, a : #0,  ⊢ Eq #1 #0 #0 ⇒ Set 0
+// [typer] infer A : Set 0, a : #0,  ⊢ Eq #1 #0 #0 ⇒ Set 0
+// [typer] infer A : Set 0,  ⊢ (a : #0) → Eq #1 #0 #0 ⇒ Set 0
+// [typer] infer  ⊢ (A : Set 0) → (a : #0) → Eq #1 #0 #0 ⇒ Set 1
+// [typer] axiom refl : VPi("A", NotHiding, VSet(0), <function>)
+// [typer] check declaration in postulate
+// [typer] extensionality : (A : Set 0) → (B : Set 0) → (f : (_ : A) → B) → (g : (_ : A) → B) → (_ : (x : A) → (Eq) (B) ((f) (x) ) ((g) (x) ) ) → (Eq) ((_ : A) → B) (f) (g) 
+// [typer] infer  ⊢ (A : Set 0) → (B : Set 0) → (f : (_ : A) → B) → (g : (_ : A) → B) → (_ : (x : A) → (Eq) (B) ((f) (x) ) ((g) (x) ) ) → (Eq) ((_ : A) → B) (f) (g) 
+// [typer] infer  ⊢ Set 0
+// [typer] infer  ⊢ Set 0 ⇒ Set 1
+// [typer] infer A : Set 0,  ⊢ (B : Set 0) → (f : (_ : A) → B) → (g : (_ : A) → B) → (_ : (x : A) → (Eq) (B) ((f) (x) ) ((g) (x) ) ) → (Eq) ((_ : A) → B) (f) (g) 
+// [typer] infer A : Set 0,  ⊢ Set 0
+// [typer] infer A : Set 0,  ⊢ Set 0 ⇒ Set 1
+// [typer] infer A : Set 0, B : Set 0,  ⊢ (f : (_ : A) → B) → (g : (_ : A) → B) → (_ : (x : A) → (Eq) (B) ((f) (x) ) ((g) (x) ) ) → (Eq) ((_ : A) → B) (f) (g) 
+// [typer] infer A : Set 0, B : Set 0,  ⊢ (_ : A) → B
+// [typer] infer A : Set 0, B : Set 0,  ⊢ A
+// [typer] infer A : Set 0, B : Set 0,  ⊢ #1 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, _ : #1,  ⊢ B
+// [typer] infer A : Set 0, B : Set 0, _ : #1,  ⊢ #1 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0,  ⊢ (_ : #1) → #1 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1,  ⊢ (g : (_ : A) → B) → (_ : (x : A) → (Eq) (B) ((f) (x) ) ((g) (x) ) ) → (Eq) ((_ : A) → B) (f) (g) 
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1,  ⊢ (_ : A) → B
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1,  ⊢ A
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1,  ⊢ #2 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, _ : #2,  ⊢ B
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, _ : #2,  ⊢ #2 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1,  ⊢ (_ : #2) → #2 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2,  ⊢ (_ : (x : A) → (Eq) (B) ((f) (x) ) ((g) (x) ) ) → (Eq) ((_ : A) → B) (f) (g) 
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2,  ⊢ (x : A) → (Eq) (B) ((f) (x) ) ((g) (x) ) 
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2,  ⊢ A
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2,  ⊢ #3 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ (Eq) (B) ((f) (x) ) ((g) (x) ) 
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ (((Eq) (B)) ((f) (x) )) ((g) (x) )
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ ((Eq) (B)) ((f) (x) )
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ (Eq) (B)
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ Eq
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ Eq ⇒ (A : Set 0) → (_ : #0) → (_ : #1) → Set 0
+// [typer] check B ⇐ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ B
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ #3 ⇒ Set 0
+// [typer] Set 0 =? Set 0 [ℓ5]
+// [typer] unify VSet(0) with VSet(0) [ℓ5]
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ Eq #3 ⇒ (_ : #3) → (_ : #4) → Set 0
+// [typer] check (f) (x)  ⇐ #3
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ (f) (x) 
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ (f) (x)
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ f
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ #2 ⇒ (_ : #4) → #4
+// [typer] check x ⇐ #4
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ x
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ #0 ⇒ #4
+// [typer] #4 =? #4 [ℓ5]
+// [typer] unify VNe(NeRigid(ℓ0, [])) with VNe(NeRigid(ℓ0, [])) [ℓ5]
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ #2 #0 ⇒ #3
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ #2 #0 ⇒ #3
+// [typer] #3 =? #3 [ℓ5]
+// [typer] unify VNe(NeRigid(ℓ1, [])) with VNe(NeRigid(ℓ1, [])) [ℓ5]
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ Eq #3 #2 #0 ⇒ (_ : #3) → Set 0
+// [typer] check (g) (x)  ⇐ #3
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ (g) (x) 
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ (g) (x)
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ g
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ #1 ⇒ (_ : #4) → #4
+// [typer] check x ⇐ #4
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ x
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ #0 ⇒ #4
+// [typer] #4 =? #4 [ℓ5]
+// [typer] unify VNe(NeRigid(ℓ0, [])) with VNe(NeRigid(ℓ0, [])) [ℓ5]
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ #1 #0 ⇒ #3
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ #1 #0 ⇒ #3
+// [typer] #3 =? #3 [ℓ5]
+// [typer] unify VNe(NeRigid(ℓ1, [])) with VNe(NeRigid(ℓ1, [])) [ℓ5]
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ Eq #3 #2 #0 #1 #0 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, x : #3,  ⊢ Eq #3 #2 #0 #1 #0 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2,  ⊢ (x : #3) → Eq #3 #2 #0 #1 #0 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ (Eq) ((_ : A) → B) (f) (g) 
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ (((Eq) ((_ : A) → B)) (f)) (g)
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ ((Eq) ((_ : A) → B)) (f)
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ (Eq) ((_ : A) → B)
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ Eq
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ Eq ⇒ (A : Set 0) → (_ : #0) → (_ : #1) → Set 0
+// [typer] check (_ : A) → B ⇐ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ (_ : A) → B
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ A
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ #4 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0, _ : #4,  ⊢ B
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0, _ : #4,  ⊢ #4 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ (_ : #4) → #4 ⇒ Set 0
+// [typer] Set 0 =? Set 0 [ℓ5]
+// [typer] unify VSet(0) with VSet(0) [ℓ5]
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ Eq (_ : #4) → #4 ⇒ (_ : (_ : #4) → #4) → (_ : (_ : #5) → #5) → Set 0
+// [typer] check f ⇐ (_ : #4) → #4
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ f
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ #2 ⇒ (_ : #4) → #4
+// [typer] (_ : #4) → #4 =? (_ : #4) → #4 [ℓ5]
+// [typer] unify VPi("_", NotHiding, VNe(NeRigid(ℓ0, [])), <function>) with VPi("_", NotHiding, VNe(NeRigid(ℓ0, [])), <function>) [ℓ5]
+// [typer] unify VNe(NeRigid(ℓ0, [])) with VNe(NeRigid(ℓ0, [])) [ℓ5]
+// [typer] unify VNe(NeRigid(ℓ1, [])) with VNe(NeRigid(ℓ1, [])) [ℓ6]
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ Eq (_ : #4) → #4 #2 ⇒ (_ : (_ : #4) → #4) → Set 0
+// [typer] check g ⇐ (_ : #4) → #4
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ g
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ #1 ⇒ (_ : #4) → #4
+// [typer] (_ : #4) → #4 =? (_ : #4) → #4 [ℓ5]
+// [typer] unify VPi("_", NotHiding, VNe(NeRigid(ℓ0, [])), <function>) with VPi("_", NotHiding, VNe(NeRigid(ℓ0, [])), <function>) [ℓ5]
+// [typer] unify VNe(NeRigid(ℓ0, [])) with VNe(NeRigid(ℓ0, [])) [ℓ5]
+// [typer] unify VNe(NeRigid(ℓ1, [])) with VNe(NeRigid(ℓ1, [])) [ℓ6]
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ Eq (_ : #4) → #4 #2 #1 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2, _ : (x : #3) → Eq #3 #2 #0 #1 #0,  ⊢ Eq (_ : #4) → #4 #2 #1 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1, g : (_ : #2) → #2,  ⊢ (_ : (x : #3) → Eq #3 #2 #0 #1 #0) → Eq (_ : #4) → #4 #2 #1 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0, f : (_ : #1) → #1,  ⊢ (g : (_ : #2) → #2) → (_ : (x : #3) → Eq #3 #2 #0 #1 #0) → Eq (_ : #4) → #4 #2 #1 ⇒ Set 0
+// [typer] infer A : Set 0, B : Set 0,  ⊢ (f : (_ : #1) → #1) → (g : (_ : #2) → #2) → (_ : (x : #3) → Eq #3 #2 #0 #1 #0) → Eq (_ : #4) → #4 #2 #1 ⇒ Set 0
+// [typer] infer A : Set 0,  ⊢ (B : Set 0) → (f : (_ : #1) → #1) → (g : (_ : #2) → #2) → (_ : (x : #3) → Eq #3 #2 #0 #1 #0) → Eq (_ : #4) → #4 #2 #1 ⇒ Set 1
+// [typer] infer  ⊢ (A : Set 0) → (B : Set 0) → (f : (_ : #1) → #1) → (g : (_ : #2) → #2) → (_ : (x : #3) → Eq #3 #2 #0 #1 #0) → Eq (_ : #4) → #4 #2 #1 ⇒ Set 1
+// [typer] axiom extensionality : VPi("A", NotHiding, VSet(0), <function>)
+// [parser] parsed test/basic.tt successfully
+// [parser] postulate
+  N : Set 0
+  z : N
+  s : (_ : N) → N
+  Eq : (A : Set 0) → (_ : A) → (_ : A) → Set 0
+  refl : (A : Set 0) → (a : A) → (Eq) (A) (a) (a) 
+  extensionality : (A : Set 0) → (B : Set 0) → (f : (_ : A) → B) → (g : (_ : A) → B) → (_ : (x : A) → (Eq) (B) ((f) (x) ) ((g) (x) ) ) → (Eq) ((_ : A) → B) (f) (g) 
+
+

@@ -133,6 +133,15 @@ pub fn Typer::new(tracer : @util.SubTracer) -> Typer {
   Typer::{ tracer, }
 }
 
+pub fn TyCtx::pp_gamma(self : TyCtx) -> String raise Failure {
+  let buffer = @buffer.new()
+  for lvl, binds in self.typs.rev().iter2() {
+    let (name, ty) = binds
+    buffer.write_string("\{name} : \{readback(lvl, ty).to_pretty()}, ")
+  }
+  buffer.to_string()
+}
+
 ///|
 fn Typer::check_expr_is_type(
   self : Typer,
@@ -152,7 +161,7 @@ pub fn Typer::check(
   expr : @concrete.Expr,
   typ : TypeVal
 ) -> Expr raise Failure {
-  self.tracer.log("check \{expr.to_pretty()} <= \{typ}")
+  self.tracer.log("check \{expr.to_pretty()} ⇐ \{readback(ctx.lvl(), typ).to_pretty()}")
   match (expr, typ) {
     // If the Hiding info of the lambda matches the Pi type
     // Γ, x : A  ⊢ t : B[x] ⇝ t'
@@ -192,16 +201,15 @@ pub fn Typer::check(
   }
 }
 
-
-
 ///|
 pub fn Typer::infer(
   self : Typer,
   ctx : TyCtx,
   expr : @concrete.Expr
 ) -> (Expr, TypeVal) raise Failure {
-  self.tracer.log("infer \{expr.to_pretty()}")
-  let (expr, tyval) : (Expr, TypeVal) = match expr {
+  let gamma = ctx.pp_gamma()
+  self.tracer.log("infer \{gamma} ⊢ \{expr.to_pretty()}")
+  let (expr, ty) : (Expr, TypeVal) = match expr {
     // (x : A) ∈ Γ
     // ------------
     // Γ ⊢ x  ⇒ A ⇝ x
@@ -291,7 +299,7 @@ pub fn Typer::infer(
         }
       }
       let u = self.check(ctx, u, a)
-      (App(t, u, h), b(VNe(Neutral::vvar(ctx.lvl()))))
+      (App(t, u, h), b(eval(ctx.values, ctx.sig, u)))
     }
     HiddenArg(_) => fail("hidden argument should not be inferred individually!")
     Lam(UntypedBinding((_, x, h)), t) => {
@@ -313,8 +321,8 @@ pub fn Typer::infer(
     Pi(TypedBinding((_, x, h, a)), b) => {
       let x = x.to_raw_name()
       let (a, a_univ) = self.check_expr_is_type(ctx, a)
-      let a_tyval = eval(ctx.values, ctx.sig, a)
-      let ctx2 = ctx.add_binding_var(x, a_tyval)
+      let a_val = eval(ctx.values, ctx.sig, a)
+      let ctx2 = ctx.add_binding_var(x, a_val)
       let (b, b_univ) = self.check_expr_is_type(ctx2, b)
       (Pi(TypedBinding((x, h, a)), b), VSet(@math.maximum(a_univ, b_univ)))
     }
@@ -325,8 +333,9 @@ pub fn Typer::infer(
     }
     Dot(_) => fail("dot expression should not be used in expression!")
   }
-  self.tracer.log("infer \{expr.to_pretty()} => \{tyval}")
-  (expr, tyval)
+  // self.tracer.log("infer \{expr.to_pretty()} ⇒ \{ty}")
+  self.tracer.log("infer \{gamma} ⊢ \{expr.to_pretty()} ⇒ \{readback(ctx.lvl(), ty).to_pretty()}")
+  (expr, ty)
 }
 
 ///|
@@ -348,33 +357,34 @@ fn Typer::axiom_check(
   let name = name.to_raw_name()
   let (ty, _) = self.check_expr_is_type(ctx, ty)
   let tyval = eval(ctx.values, ctx.sig, ty)
+  self.tracer.log("axiom \{name} : \{tyval}")
   ctx.add_axiom(name, tyval)
 }
 
 ///|
-fn Typer::data_check(
-  self : Typer,
-  ctx : TyCtx,
-  name : Name,
-  param : @concrete.Telescope,
-  ty : @concrete.Expr,
-  cons : Array[@concrete.Declaration]
-) -> TyCtx raise Failure {
-  // data
-  let data_ty = @concrete.Expr::telescope_pi(param, ty)
-  // constructors
-  for con in cons {
-    match con {
-      TypeSig(x, ty) => {
-        let (ty, _) = self.check_expr_is_type(ctx, ty)
-        let tyval = eval(ctx.values, ctx.sig, ty)
-        ctx = ctx.add_axiom(x.to_raw_name(), tyval)
-      }
-      _ => fail("constructor declaration not implemented yet")
-    }
-  }
-  fail("data check not implemented yet")
-}
+// fn Typer::data_check(
+//   self : Typer,
+//   ctx : TyCtx,
+//   name : Name,
+//   param : @concrete.Telescope,
+//   ty : @concrete.Expr,
+//   cons : Array[@concrete.Declaration]
+// ) -> TyCtx raise Failure {
+//   // data
+//   let data_ty = @concrete.Expr::telescope_pi(param, ty)
+//   // constructors
+//   for con in cons {
+//     match con {
+//       TypeSig(x, ty) => {
+//         let (ty, _) = self.check_expr_is_type(ctx, ty)
+//         let tyval = eval(ctx.values, ctx.sig, ty)
+//         ctx = ctx.add_axiom(x.to_raw_name(), tyval)
+//       }
+//       _ => fail("constructor declaration not implemented yet")
+//     }
+//   }
+//   fail("data check not implemented yet")
+// }
 
 ///|
 fn Typer::check_declarations(
@@ -388,11 +398,25 @@ fn Typer::check_declarations(
     self.tracer.log("check declaration")
     self.tracer.log(decl.to_pretty())
     let checked_decl = match decl {
-      TypeSig(x, ty) => ctx2 = self.axiom_check(ctx2, x, ty)
+      // TypeSig(x, ty) => ctx2 = self.axiom_check(ctx2, x, ty)
       DataDef(_, d, telescope, ty, cons) =>
-        ctx2 = self.data_check(ctx2, d, telescope, ty, cons)
-      FunClause(_) => ...
-      Mutual(_) | Postulate(_) | Command(_) => fail("not implemented yet")
+        fail("data definition not implemented yet")
+      Postulate(r, ds) =>
+        for d in ds {
+          match d {
+            TypeSig(x, ty) => {
+              self.tracer.log("check declaration in postulate")
+              self.tracer.log(d.to_pretty())
+              ctx2 = self.axiom_check(ctx2, x, ty)
+            }
+            _ =>
+              fail(
+                "postulate at \{r} constains non-axiom declaration \{d.to_pretty()}",
+              )
+          }
+        }
+      TypeSig(_) | Mutual(_) | FunClause(_) | Command(_) =>
+        fail("not implemented yet")
     }
     checked_decls.push(checked_decl)
   }
@@ -405,6 +429,16 @@ pub fn Typer::check_program(
 ) -> Unit raise Failure {
   let ctx = TyCtx::new()
   self.check_declarations(ctx, program)
+  let unsolved_metas = unsolved_metas()
+  if unsolved_metas.is_empty() {
+    println("All Done.")
+  } else {
+    println("Unsolved metas:")
+    for meta_info in unsolved_metas {
+      let (mv, ty) = meta_info
+      println("\{mv} : \{ty}")
+    }
+  }
 }
 
 ///|

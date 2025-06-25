@@ -1,0 +1,9 @@
+
+postulate
+  N : Set     -- Set is the first universe
+  z : N
+  s : N -> N  -- The independent function space is written A -> B
+  
+  Eq : (A : Set)  -> A  -> A  -> Set 0   -- Equiality Type
+  refl : (A : Set)  -> (a : A)  -> Eq A a a 
+  extensionality : (A : Set) -> (B : Set) -> (f : A -> B) -> (g : A -> B) -> ((x : A) -> Eq B (f x) (g x)) -> Eq (A -> B) f g

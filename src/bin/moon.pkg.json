@@ -5,9 +5,9 @@
     "moonbitlang/x/sys",
     "moonbitlang/x/fs",
     "floatshadow/rowmltt/syntax/concrete",
-    "floatshadow/rowmltt/syntax/abstract",
     "floatshadow/rowmltt/lexer",
     "floatshadow/rowmltt/parser",
+    "floatshadow/rowmltt/typer",
     "floatshadow/rowmltt/util"
   ]
 }

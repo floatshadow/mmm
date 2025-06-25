@@ -152,6 +152,22 @@ fn eval_meta(mv : MetaVar) -> Value raise Failure {
 }
 
 ///|
+fn eval_app_bds(
+  env : VEnv,
+  sig : Sig,
+  m : Value,
+  bds : List[Bounding]
+) -> Value raise Failure {
+  match (env, bds) {
+    (Nil, Nil) => m
+    (Cons((_, t), env), Cons(Bound, bds)) =>
+      eval_app(env, sig, eval_app_bds(env, sig, m, bds), t, Hiding::NotHiding)
+    (Cons(_, env), Cons(Defined, bds)) => eval_app_bds(env, sig, m, bds)
+    _ => fail("the environment \{env} and the bounding \{bds} do not match")
+  }
+}
+
+///|
 fn force_meta(env : VEnv, sig : Sig, value : Value) -> Value raise Failure {
   match value {
     VNe(NeFlex(mv, spine)) if lookup_meta(mv) is Some(Solved(v, _)) =>
@@ -192,6 +208,7 @@ pub fn eval(env : VEnv, sig : Sig, expr : Expr) -> Value raise Failure {
       let arg = eval(env, sig, arg)
       eval_app(env, sig, f, arg, h)
     }
+    InsertedMeta(mv, bds) => eval_app_bds(env, sig, eval_meta(mv), bds)
     Let(_) => fail("let expression is not supported in evaluation")
   }
 }
@@ -218,6 +235,8 @@ fn readback_neutral(n_free_vars : Int, ntr : Neutral) -> Expr raise Failure {
     NeRigid(x, spine) =>
       readback_spine(Var(@syntax.lvl2idx(n_free_vars, x)), spine)
     NeFlex(mv, spine) => readback_spine(Meta(mv), spine)
+    NeCon(name, spine) => readback_spine(Con(name), spine)
+    NeDef(name, spine) => readback_spine(Def(name), spine)
   }
 }
 

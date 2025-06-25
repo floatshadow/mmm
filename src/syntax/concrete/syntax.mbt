@@ -226,12 +226,12 @@ fn PrettyExpr::print_one_level(
     Ident(x) => logger.write_string("\{x}")
     Set(_, i) => logger.write_string("Set \{i}")
     Pi(bind, return_ty) => {
-      logger.write_string("\{bind} ")
-      logger.write_string(" -> ")
+      logger.write_string("\{bind}")
+      logger.write_string(" → ")
       PrettyExpr::print_one_level(logger, return_ty)
     }
     Lam(utbind, body) => {
-      logger.write_string("λ \{utbind}")
+      logger.write_string("λ\{utbind}")
       logger.write_string(". ")
       PrettyExpr::print_one_level(logger, body)
     }
