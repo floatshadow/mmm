@@ -266,7 +266,7 @@ fn Typer::unify(
   }
 }
 
-
+///|
 fn Typer::unify_err(
   self : Typer,
   env : VEnv,
@@ -277,6 +277,8 @@ fn Typer::unify_err(
 ) -> Unit raise Failure {
   let t1 = readback(lvl, v1)
   let t2 = readback(lvl, v2)
-  self.tracer.log("unify \{t1.to_pretty()} with \{t2.to_pretty()} [ de Burijn level \{lvl}]")
+  self.tracer.log(
+    "unify \{t1.to_pretty()} with \{t2.to_pretty()} [ de Burijn level \{lvl}]",
+  )
   self.unify(env, sig, lvl, v1, v2)
 }

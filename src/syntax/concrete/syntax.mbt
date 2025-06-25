@@ -30,6 +30,7 @@ pub(all) enum Expr {
   Pi(TypedBinding, Type) // Π (x : A). B[x] or  Π {x : A}. B[x]
   Lam(UntypedBinding, Expr) // λ x . t or λ {x} . t
   RawApp(Range, List2[Expr]) // t1 t2 ... tn
+  App(Range, Expr, Expr) // t1 t2 ... tn
   HiddenArg(Range, Name?, Expr) // {e} or {x = e}
   Dot(Range, Expr) // .p, only in patterns
 }
@@ -134,6 +135,7 @@ pub impl @util.HasRange for Expr with get_range(self) {
     Pi(tbind, t) => Range::merge_range(tbind, t)
     Lam(utbind, e) => Range::merge_range(utbind, e)
     RawApp(r, _) => r
+    App(r, _, _) => r
     HiddenArg(r, _, _) => r
     Dot(r, _) => r
   }
@@ -240,6 +242,13 @@ fn PrettyExpr::print_one_level(
         logger.write_string(")")
         logger.write_string(" ")
       }
+    App(_, e1, e2) => {
+      logger.write_string("(")
+      PrettyExpr::print_one_level(logger, e1)
+      logger.write_string(") (")
+      PrettyExpr::print_one_level(logger, e2)
+      logger.write_string(")")
+    }
     Hole(_) => logger.write_string("_")
     HiddenArg(_, Some(name), e) => {
       logger.write_string("{\{name} = ")

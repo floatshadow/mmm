@@ -11,6 +11,9 @@ typealias @syntax.Bounding
 typealias @syntax.DBlvl
 
 ///|
+typealias @util.Range
+
+///|
 pub struct TyCtx {
   values : VEnv
   typs : VEnv
@@ -34,7 +37,7 @@ pub fn TyCtx::add_binding_var(
   name : String,
   typ : TypeVal
 ) -> TyCtx {
-  let value = VNe(Neutral::var(name))
+  let value = VNe(Neutral::vvar(self.lvl()))
   {
     ..self,
     values: self.values.add((name, value)),
@@ -170,39 +173,26 @@ pub fn Typer::check(
       let t = self.check(ctx2, t, b(VNe(Neutral::vvar(ctx.lvl()))))
       Lam(UntypedBinding((x, Hiding)), t)
     }
-    (Hole(_), a) => {
-      fresh_meta(ctx)
-    }
+    (Hole(_), a) => fresh_meta(ctx)
     // Γ  ⊢ e ⇒ B   A ≡ B (NbE & unify)
     // -------------------
     // Γ  ⊢ e ⇐ A
     (t, expected_tyval) => {
       let (t, infer_tyval) = self.infer(ctx, t)
       // check if inferred type is equal to given type
-      self.unify_err(ctx.values, ctx.sig,  ctx.lvl(), infer_tyval, expected_tyval)
+      self.unify_err(
+        ctx.values,
+        ctx.sig,
+        ctx.lvl(),
+        infer_tyval,
+        expected_tyval,
+      )
       t
     }
   }
 }
 
-///|
-fn Typer::infer_app(
-  self : Typer,
-  ctx : TyCtx,
-  t : @concrete.Expr,
-  u : @concrete.Expr
-) -> (Expr, TypeVal) raise Failure {
-  let (f, f_tyval) = self.infer(ctx, f)
-  match f_tyval {
-    VPi(_, _, param_ty_value, return_ty_func) => {
-      // check the argument type
-      self.check(ctx, arg, param_ty_value)
-      // return the function type applied to the argument
-      (App(f, arg, h), return_ty_func(eval(ctx.values, ctx.sig, arg)))
-    }
-    _ => fail("\{f} is not of (dependent) function type")
-  }
-}
+
 
 ///|
 pub fn Typer::infer(
@@ -211,10 +201,10 @@ pub fn Typer::infer(
   expr : @concrete.Expr
 ) -> (Expr, TypeVal) raise Failure {
   self.tracer.log("infer \{expr.to_pretty()}")
-  let (expr, tyval) = match expr {
+  let (expr, tyval) : (Expr, TypeVal) = match expr {
     // (x : A) ∈ Γ
     // ------------
-    // Γ |- x  ⇒ A
+    // Γ ⊢ x  ⇒ A ⇝ x
     Ident(x) => {
       let x = x.to_raw_name()
       // de burijn index
@@ -231,7 +221,7 @@ pub fn Typer::infer(
       }
 
       match go(0, ctx.typs) {
-        Some(it) => it
+        Some((idx, ty)) => (Var(idx), ty)
         None =>
           match ctx.sig.constants.get(x) {
             Some(f) => (Def(x), f.ty)
@@ -244,40 +234,82 @@ pub fn Typer::infer(
       }
     }
     // -------------------------
-    // Γ |- Set i => Set (i + 1)
+    // Γ ⊢ Set (i) ⇒ Set (i + 1) ⇝ Set (i)
     Set(_, i) => (Set(i), VSet(i + 1))
-    // Γ |- e1 => A -> B  Γ, x : A |- e2 <= A
-    // ---------------------------------------
-    // Γ |- e1 e2 => B[x |-> t]
-    // App(f, arg) => {
-    //   let infer_f_ty = infer(ctx, f)
-    //   match infer_f_ty {
-    //     VPi(param_ty_value, return_ty_func) => {
-    //       check(ctx, arg, param_ty_value)
-    //       return_ty_func(eval(ctx.values, arg))
-    //     }
-    //     _ => fail("\{f} is not of (dependent) function type")
-    //   }
-    // }
+    // Γ ⊢ e1 ⇒ A -> B ⇝ t   Γ, x : A ⊢ e2 ⇐ A  ⇝ u
+    // -----------------------------------------
+    // Γ ⊢ e1 e2 ⇒ B[t] ⇝ t u
+    RawApp(_, es) => {
+      let apps = match es {
+        Cons(e1, e2, es2) =>
+          loop (e1, e2, es2) {
+            (e1, e2, Nil) =>
+              break @concrete.App(Range::merge_range(e1, e1), e1, e2)
+            (e1, e2, Cons(e3, es3)) =>
+              continue (
+                  @concrete.App(Range::merge_range(e1, e1), e1, e2),
+                  e3,
+                  es3,
+                )
+          }
+      }
+      self.infer(ctx, apps)
+    }
+    App(_, t, u) => {
+      let (t, t_tyval, h) : (Expr, TypeVal, Hiding) = match u {
+        HiddenArg(_) => {
+          let (t, t_tyval) = self.infer(ctx, t)
+          (t, t_tyval, Hiding)
+        }
+        _ => {
+          let (t, t_tyval) = insert_implicit_app(ctx, self.infer(ctx, t))
+          (t, t_tyval, NotHiding)
+        }
+      }
+      // ensure t is of Pi type
+      let (a, b) = match force_meta(ctx.values, ctx.sig, t_tyval) {
+        VPi(_, h2, a, b) => {
+          guard h == h2 else { fail("hiding mismatch: \{h} != \{h2}") }
+          (a, b)
+        }
+        _ => {
+          let a = eval(ctx.values, ctx.sig, fresh_meta(ctx))
+          fn b_tyval(a : TypeVal) -> TypeVal raise Failure {
+            let ctx2 = ctx.add_binding_var("x", a)
+            let b = fresh_meta(ctx2)
+            eval(ctx.values, ctx.sig, b)
+          }
+
+          self.unify_err(
+            ctx.values,
+            ctx.sig,
+            ctx.lvl(),
+            t_tyval,
+            VPi("x", h, a, b_tyval),
+          )
+          (a, b_tyval)
+        }
+      }
+      let u = self.check(ctx, u, a)
+      (App(t, u, h), b(VNe(Neutral::vvar(ctx.lvl()))))
+    }
     HiddenArg(_) => fail("hidden argument should not be inferred individually!")
     Lam(UntypedBinding((_, x, h)), t) => {
       // \ x : ?m .t
       let a = eval(ctx.values, ctx.sig, fresh_meta(ctx))
       let x = x.to_raw_name()
       let ctx2 = ctx.add_binding_var(x, a)
-      let (t, b) = self.infer(ctx2, t)
-      let (t, b) = insert_implicit_app(ctx2, (t, b))
+      let (t, b) = insert_implicit_app(ctx2, self.infer(ctx2, t))
       fn b_tyval(a : TypeVal) -> TypeVal raise Failure {
-        let env2 = ctx.values.add((x, a))
-        let b = readback_type(env2, ctx.sig, b)
+        let b = readback(ctx.lvl() + 1, b)
         eval(ctx.values.add((x, a)), ctx.sig, b)
       }
 
       (Lam(UntypedBinding((x, h)), t), VPi(x, h, a, b_tyval))
     }
-    // Γ |- A => Set i  Γ, x : A |- B[x] => Set j
+    // Γ ⊢ A ⇒ Set (i)  Γ, x : A ⊢ B[x] ⇒ Set j
     // -----------------------------------------
-    // Γ |- Π (x : A). B[x] => Set (max(i, j))
+    // Γ ⊢ Π (x : A). B[x] ⇒ Set (max(i, j))
     Pi(TypedBinding((_, x, h, a)), b) => {
       let x = x.to_raw_name()
       let (a, a_univ) = self.check_expr_is_type(ctx, a)
@@ -292,19 +324,6 @@ pub fn Typer::infer(
       (t, a)
     }
     Dot(_) => fail("dot expression should not be used in expression!")
-    // Γ |- e1 <= A  Γ, x : A |- e2 => B
-    // ----------------------------------
-    // Γ |- let x : A = e1 in e2 => B
-    // Let((x, x_typ), e1, e2) => {
-    //   let _ = check_expr_is_type(ctx, x_typ)
-    //   let x_typ_value = eval(ctx.values, x_typ)
-    //   // println("let \{x}: \{x_typ_value}")
-    //   let _ = check(ctx, e1, x_typ_value)
-    //   let e1_value = eval(ctx.values, e1)
-    //   // println("let \{x} = \{e1_value}")
-    //   let ctx2 = ctx.add_definition_var(x, e1_value, x_typ_value)
-    //   infer(ctx2, e2)
-    // }
   }
   self.tracer.log("infer \{expr.to_pretty()} => \{tyval}")
   (expr, tyval)
