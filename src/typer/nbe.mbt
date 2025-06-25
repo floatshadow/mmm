@@ -114,7 +114,8 @@ fn eval_app(
           }
           let spine2 = extend_spine(spine, v, vh)
           match fun_def.definitions {
-            Some(clauses) if clauses.length() == spine2.length() && match_clauses(env, sig, clauses, spine2)  is Some(v) => v
+            Some(clauses) if clauses.length() == spine2.length() &&
+              match_clauses(env, sig, clauses, spine2) is Some(v) => v
             _ => VNe(NeDef(name, spine2))
           }
         }
@@ -158,13 +159,15 @@ fn force_meta(env : VEnv, sig : Sig, value : Value) -> Value raise Failure {
     _ => value
   }
 }
+
 ///|
 pub fn eval(env : VEnv, sig : Sig, expr : Expr) -> Value raise Failure {
   match expr {
-    Var(ix) => match env.nth(ix.inner()) {
-      Some((_, v)) => v
-      None => fail("does not find variable \{ix} in environment \{env}")
-    }
+    Var(ix) =>
+      match env.nth(ix.inner()) {
+        Some((_, v)) => v
+        None => fail("does not find variable \{ix} in environment \{env}")
+      }
     Def(f) => VNe(Neutral::def(f))
     Con(c) => VNe(Neutral::con(c))
     Meta(mv) => eval_meta(mv)
@@ -197,14 +200,8 @@ pub fn eval(env : VEnv, sig : Sig, expr : Expr) -> Value raise Failure {
 // Generate fresh name for normalization given used names.
 
 ///|
-fn readback_neutral(
-  n_free_vars : Int,
-  ntr : Neutral,
-) -> Expr raise Failure {
-  fn readback_spine(
-    head : Expr,
-    spine : Spine,
-  ) -> Expr raise Failure {
+fn readback_neutral(n_free_vars : Int, ntr : Neutral) -> Expr raise Failure {
+  fn readback_spine(head : Expr, spine : Spine) -> Expr raise Failure {
     let mut app = head
     for named_arg in spine {
       match named_arg {
@@ -218,29 +215,29 @@ fn readback_neutral(
   }
 
   match ntr {
-    NeRigid(x, spine) => readback_spine(Var(@syntax.lvl2idx(n_free_vars, x)), spine)
+    NeRigid(x, spine) =>
+      readback_spine(Var(@syntax.lvl2idx(n_free_vars, x)), spine)
     NeFlex(mv, spine) => readback_spine(Meta(mv), spine)
   }
 }
 
 ///|
-pub fn readback(
-  free_vars : Int,
-  value : Value,
-) -> Expr raise Failure {
+pub fn readback(free_vars : Int, value : Value) -> Expr raise Failure {
   match value {
-    VLam(x, h, t) => {
+    VLam(x, h, t) =>
       // Functions
       // λx. t / neutral value
       // Generate a symbolic argument (neutral variable `x`)
       // to trigger the normalization of body `t`.
-      Lam(UntypedBinding((x, h)),
-        readback(free_vars + 1, t(VNe(Neutral::vvar(free_vars))))
+      Lam(
+        UntypedBinding((x, h)),
+        readback(free_vars + 1, t(VNe(Neutral::vvar(free_vars)))),
       )
-    }
-    VPi(x, h, a, b) => {
-      Pi(TypedBinding((x, h, readback(free_vars, a))), readback(free_vars + 1, b(VNe(Neutral::vvar(free_vars)))))
-    }
+    VPi(x, h, a, b) =>
+      Pi(
+        TypedBinding((x, h, readback(free_vars, a))),
+        readback(free_vars + 1, b(VNe(Neutral::vvar(free_vars)))),
+      )
     VSet(i) => Set(i)
     VNe(ntr) => readback_neutral(free_vars, ntr)
   }

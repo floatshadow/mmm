@@ -65,6 +65,11 @@ pub fn TyCtx::add_definition_var(
 }
 
 ///|
+pub fn TyCtx::lvl(self : TyCtx) -> Int {
+  self.lvl.inner()
+}
+
+///|
 pub fn TyCtx::boundings(self : TyCtx) -> List[Bounding] {
   self.bounds
 }
@@ -79,13 +84,13 @@ pub fn TyCtx::boundings(self : TyCtx) -> List[Bounding] {
 //   - elimination forms: inference
 //
 // Two rules dicates the mode change between checking and inference
-// Γ |- e <= A
+// Γ  ⊢ e ⇐ A
 // --------------- (T-Anno)
-// Γ |- e : A => A 
+// Γ |- e : A ⇒ A 
 // 
-// Γ |- e => A   Γ |- A ≡ B
+// Γ  ⊢ e ⇒ A   Γ |- A ≡ B
 // ------------------------ (T-Conv)
-// Γ |- e <= B
+// Γ  ⊢ e ⇐ B
 //
 // The implicit argument insertion is based on section 2.6 of 
 // Elaboration with first-class implicit function types.
@@ -144,43 +149,37 @@ pub fn Typer::check(
   expr : @concrete.Expr,
   typ : TypeVal
 ) -> Expr raise Failure {
-  // println("check \{expr} <= \{typ}")
+  self.tracer.log("check \{expr.to_pretty()} <= \{typ}")
   match (expr, typ) {
-    // A ~> (x : B) -> C[x]   Γ, x : B |- e : C[x] ~ t
-    // ------------------------------------------
-    // Γ |- λx. e <= A ~ λx. t
     // If the Hiding info of the lambda matches the Pi type
+    // Γ, x : A  ⊢ t : B[x] ⇝ t'
+    // ------------------------------------------
+    // Γ  ⊢  λx. t ⇐ (x : A) -> B[x] ⇝ λx. t'
     (Lam(UntypedBinding((_, x, h1)), t), VPi(_, h2, a, b)) if h1 == h2 => {
       let x = x.to_raw_name()
       let ctx2 = ctx.add_binding_var(x, a)
-      let x_val = VNe(Neutral::vvar(x))
-      let expected_b = b(x_val)
-      let t = self.check(ctx2, t, expected_b)
+      let t = self.check(ctx2, t, b(VNe(Neutral::vvar(ctx.lvl()))))
       Lam(UntypedBinding((x, h1)), t)
     }
     // Otherwise if Pi is hiding, insert a new implicit lambda
+    // Γ, x : A  ⊢ t : B[x] ⇝ t'
+    // ------------------------------------------
+    // Γ  ⊢ t ⇐ {x : A} -> B[x] ⇝ λx. t'
     (t, VPi(x, Hiding, a, b)) => {
       let ctx2 = ctx.add_binding_var(x, a)
-      let x_val = VNe(Neutral::vvar(x))
-      let t = self.check(ctx2, t, b(x_val))
+      let t = self.check(ctx2, t, b(VNe(Neutral::vvar(ctx.lvl()))))
       Lam(UntypedBinding((x, Hiding)), t)
     }
-    // (Let((x, x_ty), e1, e2), a) => {
-    //   let (x_ty, _) = self.check_expr_is_type(ctx, x_ty)
-    //   let x_tyval = eval(ctx.values, ctx.sig, x_ty)
-    //   let e1 = self.check(ctx, e1, x_tyval)
-    //   let e1_val = eval(ctx.values, ctx.sig, e1)
-    //   let ctx2 = ctx.add_definition_var(x, e1_val, x_tyval)
-    //   let u = self.check(ctx2, e2, typ)
-    //   Let((x, x_ty), e1, u)
-    // }
-    // Γ |- e => B  A = B
+    (Hole(_), a) => {
+      fresh_meta(ctx)
+    }
+    // Γ  ⊢ e ⇒ B   A ≡ B (NbE & unify)
     // -------------------
-    // Γ |- e <= A
+    // Γ  ⊢ e ⇐ A
     (t, expected_tyval) => {
-      let (t, infer_tyval) = self.infer(ctx, expr)
+      let (t, infer_tyval) = self.infer(ctx, t)
       // check if inferred type is equal to given type
-      unify(ctx.values, ctx.sig, ctx.names, infer_tyval, expected_tyval)
+      self.unify_err(ctx.values, ctx.sig,  ctx.lvl(), infer_tyval, expected_tyval)
       t
     }
   }
@@ -215,22 +214,22 @@ pub fn Typer::infer(
   let (expr, tyval) = match expr {
     // (x : A) ∈ Γ
     // ------------
-    // Γ |- x => A
+    // Γ |- x  ⇒ A
     Ident(x) => {
       let x = x.to_raw_name()
       // de burijn index
-      fn go(index : Int, types : VEnv) -> Option[(Int, TypeVal)] {
+      fn go(index : Int, types : VEnv) -> (Int, TypeVal)? {
         match types {
-          Cons((y, v), tl) => {
-            if (x == y) {
+          Cons((y, v), tl) =>
+            if x == y {
               Some((index, v))
             } else {
               go(index + 1, tl)
             }
-          }
           Nil => None
         }
       }
+
       match go(0, ctx.typs) {
         Some(it) => it
         None =>
@@ -261,10 +260,6 @@ pub fn Typer::infer(
     //   }
     // }
     HiddenArg(_) => fail("hidden argument should not be inferred individually!")
-    RawApp(_, Cons(f, e1, es)) => {
-      loop ()
-
-    }
     Lam(UntypedBinding((_, x, h)), t) => {
       // \ x : ?m .t
       let a = eval(ctx.values, ctx.sig, fresh_meta(ctx))
@@ -406,4 +401,9 @@ pub fn alpha_equiv(e1 : Expr, e2 : Expr) -> Bool {
       alpha_equiv(f1, f2) && alpha_equiv(a1, a2)
     _ => false
   }
+}
+
+///|
+pub struct PrettyTyCtx {
+  ctx : TyCtx
 }

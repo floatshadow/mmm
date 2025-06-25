@@ -225,9 +225,9 @@ fn Typer::unify(
   v1 : TypeVal,
   v2 : TypeVal
 ) -> Unit raise Failure {
+  self.tracer.log("unify \{v1} with \{v2} [ de Burijn level \{lvl}]")
   let v1 = force_meta(env, sig, v1)
   let v2 = force_meta(env, sig, v2)
-  self.tracer.log("unify \{v1} with \{v2} [ de Burijn level \{lvl}]")
   fn bind_name(x1 : String, x2 : String) -> String {
     x1 + "#" + x2
   }
@@ -264,4 +264,19 @@ fn Typer::unify(
     (v, VNe(NeFlex(mv, sp))) => self.solve(env, sig, lvl, mv, sp, v)
     _ => fail("unification failed: unify \{v1} with \{v2}")
   }
+}
+
+
+fn Typer::unify_err(
+  self : Typer,
+  env : VEnv,
+  sig : Sig,
+  lvl : Int,
+  v1 : TypeVal,
+  v2 : TypeVal
+) -> Unit raise Failure {
+  let t1 = readback(lvl, v1)
+  let t2 = readback(lvl, v2)
+  self.tracer.log("unify \{t1.to_pretty()} with \{t2.to_pretty()} [ de Burijn level \{lvl}]")
+  self.unify(env, sig, lvl, v1, v2)
 }
