@@ -79,9 +79,7 @@ fn main {
     }
     // for spanned_tokens in tokens {
     //   let (tok, _, _) = spanned_tokens
-    //   println(
-    //     "\{tok}"
-    //   )
+    //   println("\{tok}")
     // }
     // parser
     let subtracer = tracer.new_subtracer(

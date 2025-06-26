@@ -2,7 +2,7 @@
 typealias @immut/list.T as List
 
 ///| Moonbit core has not transferred List::map to error polymorphic version yet.
-fn[A, B] map_exn(xs : List[A], f : (A) -> B raise) -> List[B] raise {
+fn[A, B] map_exn(xs : List[A], f : (A) -> B raise?) -> List[B] raise? {
   match xs {
     Nil => Nil
     Cons(hd, tl) => Cons(f(hd), map_exn(tl, f))
@@ -44,7 +44,10 @@ pub fn[A] List1::length(self : List1[A]) -> Int {
 }
 
 ///|
-pub fn[A, B] List1::map(self : List1[A], f : (A) -> B raise) -> List1[B] raise {
+pub fn[A, B] List1::map(
+  self : List1[A],
+  f : (A) -> B raise?
+) -> List1[B] raise? {
   match self {
     Cons(hd, tl) => Cons(f(hd), map_exn(tl, f))
   }
@@ -207,7 +210,10 @@ pub(all) enum List2[A] {
 } derive(Eq)
 
 ///|
-pub fn[A, B] List2::map(self : List2[A], f : (A) -> B raise) -> List2[B] raise {
+pub fn[A, B] List2::map(
+  self : List2[A],
+  f : (A) -> B raise?
+) -> List2[B] raise? {
   match self {
     Cons(a1, a2, tl) => Cons(f(a1), f(a2), map_exn(tl, f))
   }

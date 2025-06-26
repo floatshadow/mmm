@@ -189,12 +189,14 @@ fn Typer::solve(
     let (_, h) = arg
     lam = Lam(UntypedBinding(("x#\{delta_lvl}", h)), lam)
   }
-  let meta_ty = match lookup_meta(mv) {
-    Some(MetaEntry::Unsolved(ty)) => ty
+  let solution = eval(Nil, sig, lam)
+  let mty = match lookup_meta(mv) {
+    Some(MetaEntry::Unsolved(mty~)) => mty
     Some(MetaEntry::Solved(_)) => fail("meta variable \{mv} already solved!")
     _ => fail("meta variable \{mv} not found in metacontext")
   }
-  metas.set(mv, MetaEntry::Solved(meta_ty, VNe(Neutral::meta(mv))))
+  self.tracer.log("  solution \{mv} [spine] : \{mty} = \{lam.to_pretty()}")
+  metas.set(mv, MetaEntry::Solved(mty~, solution))
 }
 
 ///|
@@ -231,10 +233,6 @@ fn Typer::unify(
   self.tracer.log("unify \{v1} with \{v2} [\{@syntax.DBlvl(lvl)}]")
   let v1 = force_meta(env, sig, v1)
   let v2 = force_meta(env, sig, v2)
-  fn bind_name(x1 : String, x2 : String) -> String {
-    x1 + "#" + x2
-  }
-
   match (v1, v2) {
     (VSet(u1), VSet(u2)) if u1 == u2 => ()
     (VLam(x1, h1, t1), VLam(x2, h2, t2)) if h1 == h2 => {
@@ -271,7 +269,7 @@ fn Typer::unify(
       self.unify_spine(env, sig, lvl, sp1, sp2)
     (VNe(NeDef(d1, sp1)), VNe(NeDef(d2, sp2))) if d1 == d2 =>
       self.unify_spine(env, sig, lvl, sp1, sp2)
-    _ => fail("unification failed: unify \{v1} with \{v2}")
+    _ => fail("unification failed: \{v1} != \{v2}")
   }
 }
 
@@ -284,8 +282,8 @@ fn Typer::unify_err(
   v1 : TypeVal,
   v2 : TypeVal
 ) -> Unit raise Failure {
-  let t1 = readback(lvl, v1)
-  let t2 = readback(lvl, v2)
+  let t1 = readback(env, sig, lvl, v1)
+  let t2 = readback(env, sig, lvl, v2)
   self.tracer.log(
     "\{t1.to_pretty()} =? \{t2.to_pretty()} [\{@syntax.DBlvl(lvl)}]",
   )

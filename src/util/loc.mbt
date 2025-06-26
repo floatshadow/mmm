@@ -194,3 +194,47 @@ pub fn[A : HasRange, B : HasRange] Range::merge_range(u : A, v : B) -> Range {
     (Range(is1), Range(is2)) => Range::new(merge(is1, is2))
   }
 }
+
+///|
+pub fn[A : HasRange, B : HasRange, C : HasRange] Range::merge_range3(
+  x1 : A,
+  x2 : B,
+  x3 : C
+) -> Range {
+  Range::merge_range(
+    Range::merge_range(x1.get_range(), x2.get_range()),
+    x3.get_range(),
+  )
+}
+
+///|
+pub fn[A : HasRange, B : HasRange, C : HasRange, D : HasRange] Range::merge_range4(
+  x1 : A,
+  x2 : B,
+  x3 : C,
+  x4 : D
+) -> Range {
+  Range::merge_range(
+    Range::merge_range3(x1.get_range(), x2.get_range(), x3.get_range()),
+    x4.get_range(),
+  )
+}
+
+///|
+pub fn[A : HasRange, B : HasRange, C : HasRange, D : HasRange, E : HasRange] Range::merge_range5(
+  x1 : A,
+  x2 : B,
+  x3 : C,
+  x4 : D,
+  x5 : E
+) -> Range {
+  Range::merge_range(
+    Range::merge_range4(
+      x1.get_range(),
+      x2.get_range(),
+      x3.get_range(),
+      x4.get_range(),
+    ),
+    x5.get_range(),
+  )
+}

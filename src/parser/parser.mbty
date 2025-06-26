@@ -26,7 +26,7 @@ typealias @util.Either
 %token VClose
 %token <(Loc, String)> ErrorMsg
 
-%token<(Interval, String)> Id
+%token<(Interval, String)> Identifier
 %token<(Interval, Int)> IntLiteral
 
 
@@ -62,6 +62,7 @@ typealias @util.Either
 %type<UntypedBinding> UntypedBinding
 %type<Telescope> Telescope
 
+%type<Name> Id
 %type<Name> BId
 %type<Expr> Expr
 %type<Expr> Expr1
@@ -128,17 +129,20 @@ Cmd
   ;
 
 
-BId
-  : Id                               { Name::new(HasRange::get_range($1.0), $1.1) }
-  | "_"                              { Name::new(NoRange, "_") }
+Id
+  : Identifier                       { Name::new(HasRange::get_range($1.0), $1.1) }
   ;
 
-
+(* BId is an identifier that can be used as a binding *)
+BId
+  : Id                               { $1 }
+  | "_"                              { Name::new(HasRange::get_range($1), "_") }
+  ;
 
 (* Top level, function types *)
 Expr
   : TypedBinding "->" Expr           { Pi($1, $3) }
-  | Application3 "->" Expr           { Pi(TypedBinding((NoRange, Name::new(NoRange, "_"), NotHiding, raw_application($1))), $3) }
+  | Application3 "->" Expr           { Pi(TypedBinding((HasRange::get_range($1), Name::new(NoRange, "_"), NotHiding, raw_application($1))), $3) }
   | Expr1                            { $1 }
   ;
 
@@ -165,11 +169,11 @@ Expr2
 
 (* Level 3 : Atoms *)
 Expr3
-  : "{" BId "=" Expr "}"             { HiddenArg(NoRange, Some($2), $4) }
-  | "{" Expr "}"                     { HiddenArg(NoRange, None, $2) }
+  : "{" BId "=" Expr "}"             { HiddenArg(Range::merge_range5($1, $2, $3, $4, $5), Some($2), $4) }
+  | "{" Expr "}"                     { HiddenArg(Range::merge_range3($1, $2, $3), None, $2) }
   | "_"                              { Hole(HasRange::get_range($1)) }
-  | "." Expr3                        { Dot(NoRange, $2) }
-  | BId                              { Ident($1) }
+  | "." Expr3                        { Dot(Range::merge_range($1, $2), $2) }
+  | Id                               { Ident($1) }
   | "Set" level=IntLiteral           { Set(Range::merge_range($1, level.0), level.1) }
   | "Set"                            { Set(HasRange::get_range($1), 0) }
   | "(" Expr ")"                     { $2 }
@@ -182,16 +186,16 @@ Application3
 
 
 UntypedBinding
-  :  BId  "."                        { UntypedBinding((NoRange, $1, NotHiding)) }
-  | "{" BId "}" "."                  { UntypedBinding((NoRange, $2, Hiding)) }
+  :  BId  "."                        { UntypedBinding((HasRange::get_range($1), $1, NotHiding)) }
+  | "{" BId "}" "."                  { UntypedBinding((Range::merge_range3($1, $2, $3), $2, Hiding)) }
   ;
 
 
 TypedBinding
-  : "(" BId ":" Expr ")"             { TypedBinding((NoRange, $2,  NotHiding, $4)) }
-  | "{" BId ":" Expr "}"             { TypedBinding((NoRange, $2,  Hiding,    $4)) }
-  | "(" Expr ")"                     { TypedBinding((NoRange, Name::new(NoRange, "_"), NotHiding, $2)) }
-  | "{" Expr "}"                     { TypedBinding((NoRange, Name::new(NoRange, "_"), Hiding,    $2)) }
+  : "(" BId ":" Expr ")"             { TypedBinding((Range::merge_range5($1, $2, $3, $4, $5), $2,  NotHiding, $4)) }
+  | "{" BId ":" Expr "}"             { TypedBinding((Range::merge_range5($1, $2, $3, $4, $5), $2,  Hiding,    $4)) }
+  | "(" Expr ")"                     { TypedBinding((Range::merge_range3($1, $2, $3), Name::new(NoRange, "_"), NotHiding, $2)) }
+  | "{" Expr "}"                     { TypedBinding((Range::merge_range3($1, $2, $3), Name::new(NoRange, "_"), Hiding,    $2)) }
   ;
 
 Telescope

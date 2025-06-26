@@ -57,11 +57,14 @@ fn match_clause(
 ) -> Value? raise Failure {
   let pats = clause.lhs_pats
   let rhs = clause.rhs
-  guard spine.length() == pats.length() else {
-    fail("arity of pattern \{pats} patterns and spine \{spine} does not match")
+  if spine.length() < pats.length() {
+    return None
   }
-  match match_pats(env, pats, spine) {
-    Some(env2) => Some(eval(env2, sig, rhs))
+  let matched_spine = spine[0:pats.length()]
+  let unmatched_spine = spine[pats.length():]
+  match match_pats(env, pats, matched_spine) {
+    Some(env2) =>
+      Some(eval_app_spine(env2, sig, eval(env2, sig, rhs), unmatched_spine))
     None => None
   }
 }
@@ -114,8 +117,8 @@ fn eval_app(
           }
           let spine2 = extend_spine(spine, v, vh)
           match fun_def.definitions {
-            Some(clauses) if clauses.length() == spine2.length() &&
-              match_clauses(env, sig, clauses, spine2) is Some(v) => v
+            Some(clauses) if match_clauses(env, sig, clauses, spine2) is Some(v) =>
+              v
             _ => VNe(NeDef(name, spine2))
           }
         }
@@ -143,7 +146,7 @@ fn eval_app_spine(
 ///|
 fn eval_meta(mv : MetaVar) -> Value raise Failure {
   match lookup_meta(mv) {
-    Some(MetaEntry::Solved(_, val)) => val
+    Some(MetaEntry::Solved(v, ..)) => v
     Some(MetaEntry::Unsolved(_)) =>
       // Unsolved meta variable, return a neutral value.
       VNe(Neutral::meta(mv))
@@ -159,7 +162,7 @@ fn eval_app_bds(
   bds : List[Bounding]
 ) -> Value raise Failure {
   match (env, bds) {
-    (Nil, Nil) => m
+    (_, Nil) => m
     (Cons((_, t), env), Cons(Bound, bds)) =>
       eval_app(env, sig, eval_app_bds(env, sig, m, bds), t, Hiding::NotHiding)
     (Cons(_, env), Cons(Defined, bds)) => eval_app_bds(env, sig, m, bds)
@@ -170,7 +173,7 @@ fn eval_app_bds(
 ///|
 fn force_meta(env : VEnv, sig : Sig, value : Value) -> Value raise Failure {
   match value {
-    VNe(NeFlex(mv, spine)) if lookup_meta(mv) is Some(Solved(v, _)) =>
+    VNe(NeFlex(mv, spine)) if lookup_meta(mv) is Some(Solved(v, ..)) =>
       force_meta(env, sig, eval_app_spine(env, sig, v, spine))
     _ => value
   }
@@ -184,7 +187,16 @@ pub fn eval(env : VEnv, sig : Sig, expr : Expr) -> Value raise Failure {
         Some((_, v)) => v
         None => fail("does not find variable \{ix} in environment \{env}")
       }
-    Def(f) => VNe(Neutral::def(f))
+    // eagerly try to expand definitions
+    Def(f) => {
+      guard sig.constants.get(f) is Some(fun_def) else {
+        fail("does not find function \{f} in signature")
+      }
+      match fun_def.definitions {
+        Some(clauses) if match_clauses(env, sig, clauses, []) is Some(v) => v
+        _ => VNe(NeDef(f, []))
+      }
+    }
     Con(c) => VNe(Neutral::con(c))
     Meta(mv) => eval_meta(mv)
     Set(i) => VSet(i)
@@ -217,13 +229,18 @@ pub fn eval(env : VEnv, sig : Sig, expr : Expr) -> Value raise Failure {
 // Generate fresh name for normalization given used names.
 
 ///|
-fn readback_neutral(n_free_vars : Int, ntr : Neutral) -> Expr raise Failure {
+fn readback_neutral(
+  env : VEnv,
+  sig : Sig,
+  n_free_vars : Int,
+  ntr : Neutral
+) -> Expr raise Failure {
   fn readback_spine(head : Expr, spine : Spine) -> Expr raise Failure {
     let mut app = head
     for named_arg in spine {
       match named_arg {
         (v, h) => {
-          let arg = readback(n_free_vars, v)
+          let arg = readback(env, sig, n_free_vars, v)
           app = App(app, arg, h)
         }
       }
@@ -241,23 +258,33 @@ fn readback_neutral(n_free_vars : Int, ntr : Neutral) -> Expr raise Failure {
 }
 
 ///|
-pub fn readback(free_vars : Int, value : Value) -> Expr raise Failure {
-  match value {
-    VLam(x, h, t) =>
+pub fn readback(
+  env : VEnv,
+  sig : Sig,
+  free_vars : Int,
+  value : Value
+) -> Expr raise Failure {
+  // println("readback: \{value} in free vars \{free_vars}")
+  match force_meta(env, sig, value) {
+    VLam(x, h, t) => {
       // Functions
       // λx. t / neutral value
       // Generate a symbolic argument (neutral variable `x`)
       // to trigger the normalization of body `t`.
+      let x_val = VNe(Neutral::vvar(free_vars))
       Lam(
         UntypedBinding((x, h)),
-        readback(free_vars + 1, t(VNe(Neutral::vvar(free_vars)))),
+        readback(env.add((x, x_val)), sig, free_vars + 1, t(x_val)),
       )
-    VPi(x, h, a, b) =>
+    }
+    VPi(x, h, a, b) => {
+      let x_val = VNe(Neutral::vvar(free_vars))
       Pi(
-        TypedBinding((x, h, readback(free_vars, a))),
-        readback(free_vars + 1, b(VNe(Neutral::vvar(free_vars)))),
+        TypedBinding((x, h, readback(env, sig, free_vars, a))),
+        readback(env.add((x, x_val)), sig, free_vars + 1, b(x_val)),
       )
+    }
     VSet(i) => Set(i)
-    VNe(ntr) => readback_neutral(free_vars, ntr)
+    VNe(ntr) => readback_neutral(env, sig, free_vars, ntr)
   }
 }

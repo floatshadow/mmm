@@ -30,7 +30,7 @@ pub(all) enum Expr {
   Pi(TypedBinding, Type) // Π (x : A). B[x] or  Π {x : A}. B[x]
   Lam(UntypedBinding, Expr) // λ x . t or λ {x} . t
   RawApp(Range, List2[Expr]) // t1 t2 ... tn
-  App(Range, Expr, Expr) // t1 t2 ... tn
+  App(Range, Expr, Expr) // t1 t2
   HiddenArg(Range, Name?, Expr) // {e} or {x = e}
   Dot(Range, Expr) // .p, only in patterns
 }
@@ -110,6 +110,21 @@ pub fn Expr::telescope_pi(telescope : Telescope, codomain : Type) -> Type {
     ty = Pi(tbind, ty)
   }
   ty
+}
+
+///|
+pub fn Pattern::to_expr(self : Pattern) -> Expr {
+  fn go(p : Pattern) -> Expr {
+    match p {
+      PIdent(x) => Ident(x)
+      PRawApp(r, ps) => RawApp(r, ps.map(go))
+      PWild(r) => Hole(r)
+      PDot(_, e) => e
+      PHiddenArg(r, x, p) => HiddenArg(r, x, go(p))
+    }
+  }
+
+  go(self)
 }
 
 ///|
@@ -249,7 +264,7 @@ fn PrettyExpr::print_one_level(
       PrettyExpr::print_one_level(logger, e2)
       logger.write_string(")")
     }
-    Hole(_) => logger.write_string("_")
+    Hole(_) => logger.write_string("?_")
     HiddenArg(_, Some(name), e) => {
       logger.write_string("{\{name} = ")
       PrettyExpr::print_one_level(logger, e)

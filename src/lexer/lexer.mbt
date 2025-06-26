@@ -176,7 +176,7 @@ fn Lexer::ident(
   let end = self.get_loc()
   let interval = Interval::new(begin, end)
   let span = self.make_span(begin)
-  let tok = Token::Id((interval, span))
+  let tok = Token::Identifier((interval, span))
   let idkw = Lexer::is_keyword(span).map_or(tok, fn(kw) {
     match kw {
       Keyword::Set => Token::KwSet(interval)
@@ -202,8 +202,10 @@ fn Lexer::command(
     let begin = self.get_loc()
     let (ident, interval) = self.ident(begin)
     let arg = match ident {
-      Token::Id(_) | Token::KwCheck(_) | Token::KwInfer(_) | Token::KwNorm(_) =>
-        (ident, interval)
+      Token::Identifier(_)
+      | Token::KwCheck(_)
+      | Token::KwInfer(_)
+      | Token::KwNorm(_) => (ident, interval)
       _ => Lexer::make_error(begin, "invalid command argument \{ident}")
     }
     cmd.push(arg)

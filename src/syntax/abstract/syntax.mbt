@@ -71,6 +71,26 @@ pub(all) enum Cmd {
 }
 
 ///|
+pub fn Expr::split_pi(self : Expr) -> (Telescope, Type) {
+  loop ([], self) {
+    (telescope, Pi(tbind, codomain)) => {
+      telescope.push(tbind)
+      continue (telescope, codomain)
+    }
+    (telescope, ty) => break (telescope, ty)
+  }
+}
+
+///|
+pub fn Expr::telescope_pi(telescope : Telescope, codomain : Type) -> Type {
+  let mut ty = codomain
+  for tbind in telescope.rev() {
+    ty = Pi(tbind, ty)
+  }
+  ty
+}
+
+///|
 pub impl Show for MetaVar with output(self, logger) {
   logger.write_string("?m\{self.inner()}")
 }
@@ -140,7 +160,7 @@ fn PrettyExpr::print_one_level(
       PrettyExpr::print_one_level(logger, return_ty)
     }
     Lam(utbind, body) => {
-      logger.write_string("λ \{utbind} . ")
+      logger.write_string("λ\{utbind}. ")
       PrettyExpr::print_one_level(logger, body)
     }
     App(func, arg, imp) => {
