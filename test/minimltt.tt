@@ -18,7 +18,6 @@ postulate
   Eq   : (A : Set) -> A -> A -> Set
   refl : (A : Set) -> (a : A) -> Eq A a a
 
--- :CHECKCTX
 
 -- boolean and
 ex1 : Bool -> Bool -> Bool
@@ -36,7 +35,5 @@ ex3 : (n : Nat) -> Eq Nat (id Nat n) n
 ex3 = \n. refl Nat n
 
 -- function equality judgement
-ex4 : (A : Set) -> Eq (A -> A) (id A) (ex2 A (id A) (id A)) 
+ex4 : (A : Set) -> Eq (A -> A) (id A) (ex2 A (\x. A) (id A)) 
 ex4 = \A. refl (A -> A) (id A)
-
--- :INFER ex1

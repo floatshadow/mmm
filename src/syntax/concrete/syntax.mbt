@@ -4,6 +4,8 @@ typealias @syntax.Name
 ///|
 typealias @syntax.Hiding
 
+typealias @syntax.NamedArg
+
 ///| (x : e) or {xs : e}
 pub(all) type TypedBinding (Range, Name, Hiding, Type)
 
@@ -30,7 +32,7 @@ pub(all) enum Expr {
   Pi(TypedBinding, Type) // Π (x : A). B[x] or  Π {x : A}. B[x]
   Lam(UntypedBinding, Expr) // λ x . t or λ {x} . t
   RawApp(Range, List2[Expr]) // t1 t2 ... tn
-  App(Range, Expr, Expr) // t1 t2
+  App(Range, Expr, NamedArg[Expr]) // t1 t2
   HiddenArg(Range, Name?, Expr) // {e} or {x = e}
   Dot(Range, Expr) // .p, only in patterns
 }
@@ -232,6 +234,11 @@ pub fn Expr::to_pretty(self : Expr) -> PrettyExpr {
   PrettyExpr::{ syntax: self }
 }
 
+pub impl Show for Expr with output(self, logger) {
+  let logger = @util.IndentLogger::new(logger)
+  PrettyExpr::print_one_level(logger, self)
+}
+
 ///|
 fn PrettyExpr::print_one_level(
   logger : @util.IndentLogger,
@@ -261,7 +268,7 @@ fn PrettyExpr::print_one_level(
       logger.write_string("(")
       PrettyExpr::print_one_level(logger, e1)
       logger.write_string(") (")
-      PrettyExpr::print_one_level(logger, e2)
+      Show::output(e2, logger)
       logger.write_string(")")
     }
     Hole(_) => logger.write_string("?_")

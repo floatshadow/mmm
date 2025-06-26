@@ -1,0 +1,62 @@
+-- Example from elabration zoo 03-holes
+
+id : (A : _) -> A -> A
+id = \A. \x. x
+
+List : Set -> Set
+List = \A. (L : _) -> (A -> L -> L) -> L -> L
+
+nil : (A : _) -> List A
+nil = \A. \L. \cons. \nil. nil
+
+cons : (A : _) -> A -> List A -> List A
+cons = \A. \x. \xs. \L. \cons. \nil. cons x (xs _ cons nil)
+
+Bool : Set
+Bool = (B : _) -> B -> B -> B
+
+true : Bool
+true = \B. \t. \f. t
+
+false : Bool
+false = \B. \t. \f. f
+
+not : Bool -> Bool
+not = \b. \B. \t. \f. b B f t
+
+list1 : List Bool
+list1 = cons _ (id _ true) (nil _)
+
+-- Leibniz equality
+Id : (A : _) -> A -> A -> Set
+Id = \A. \x. \y. (P : A -> Set) -> P x -> P y
+
+refl : (A : _) -> (x : A) -> Id A x x
+refl = \A. \x. \P. \px. px
+
+list2 : List Bool
+list2 = cons _ true (cons _ false (nil _))
+
+Nat : Set
+Nat = (N : Set) -> (N -> N) -> N -> N
+
+five : Nat
+five = \N. \s. \z. s (s (s (s (s z))))
+
+add : Nat -> Nat -> Nat
+add = \a. \b. \N. \s. \z. a N s (b N s z)
+
+mul : Nat -> Nat -> Nat
+mul = \a. \b. \N. \s. \z. a N (b N s) z
+
+ten : Nat
+ten = add five five
+
+hundred : Nat
+hundred = mul ten ten
+
+thousand : Nat
+thousand = mul ten hundred
+
+eqTest : Id _ hundred hundred
+eqTest = refl _ _

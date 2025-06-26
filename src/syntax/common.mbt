@@ -41,7 +41,7 @@ pub(all) enum Bounding {
 } derive(Show, Eq)
 
 ///| e, (x = e) or {x = e}
-pub(all) type NamedArg[T] (Range, Name?, Hiding, T) derive(Show)
+pub(all) type NamedArg[T] (Range, Name?, Hiding, T)
 
 ///|
 pub fn[A, B] NamedArg::fmap(
@@ -52,6 +52,27 @@ pub fn[A, B] NamedArg::fmap(
     NamedArg((r, x, hiding, v)) => NamedArg((r, x, hiding, f(v)))
   }
 }
+
+pub impl [T : Show] Show for NamedArg[T] with output(self, logger) {
+  match self {
+    NamedArg((_, Some(x), Hiding, e)) => {
+      logger.write_string("{\{x} = ")
+      Show::output(e, logger)
+      logger.write_string("}")
+    }
+    NamedArg((_, None, Hiding, e)) => {
+      logger.write_string("{")
+      Show::output(e, logger)
+      logger.write_string("}")
+    }
+    NamedArg((_, Some(x), NotHiding, e)) => {
+      logger.write_string("\{x} = ")
+      Show::output(e, logger)
+    }
+    NamedArg((_, None, NotHiding, e)) => Show::output(e, logger)
+  }
+}
+
 
 ///|
 pub typealias @immut/hashmap.T[String, String] as NameMap

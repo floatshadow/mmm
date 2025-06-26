@@ -10,6 +10,7 @@ typealias @syntax.Bounding
 ///|
 typealias @syntax.DBlvl
 
+typealias @syntax.NamedArg
 ///|
 typealias @util.Range
 
@@ -313,11 +314,19 @@ pub fn Typer::infer(
       let apps = match es {
         Cons(e1, e2, es2) =>
           loop (e1, e2, es2) {
+            (e1, HiddenArg(r, x, e2), Nil) =>
+              break @concrete.App(NoRange, e1, NamedArg((r, x, Hiding, e2)))
             (e1, e2, Nil) =>
-              break @concrete.App(Range::merge_range(e1, e1), e1, e2)
+              break @concrete.App(NoRange, e1, NamedArg((NoRange, None, NotHiding, e2)))
+            (e1, HiddenArg(r, x, e2), Cons(e3, es3)) =>
+              continue (
+                  @concrete.App(NoRange, e1, NamedArg((r, x, Hiding, e2))),
+                  e3,
+                  es3,
+                )
             (e1, e2, Cons(e3, es3)) =>
               continue (
-                  @concrete.App(Range::merge_range(e1, e1), e1, e2),
+                  @concrete.App(NoRange, e1, NamedArg((NoRange, None, NotHiding, e2))),
                   e3,
                   es3,
                 )
@@ -326,17 +335,22 @@ pub fn Typer::infer(
       self.infer(ctx, apps)
     }
     App(_, t, u) => {
-      let (t, t_tyval, h) : (Expr, TypeVal, Hiding) = match u {
-        HiddenArg(_) => {
+      let (t, t_tyval, u, h) : (Expr, TypeVal, @concrete.Expr, Hiding) = match u {
+        NamedArg((_, None, Hiding, u)) => {
           let (t, t_tyval) = self.infer(ctx, t)
-          (t, t_tyval, Hiding)
+          (t, t_tyval, u, Hiding)
         }
-        _ => {
+        NamedArg((_, None, NotHiding, u)) => {
           let (t, t_tyval) = self.insert_hiding_app_unchecked(
             ctx,
             self.infer(ctx, t),
           )
-          (t, t_tyval, NotHiding)
+          (t, t_tyval, u, NotHiding)
+        }
+        NamedArg((r, Some(x), _, _)) => {
+          fail(
+            "at \{r}, do not named hidden argument \{x}"
+          )
         }
       }
       // ensure t is of Pi type
@@ -370,7 +384,9 @@ pub fn Typer::infer(
       let u = self.check(ctx, u, a)
       (App(t, u, h), b(eval(ctx.values, ctx.sig, u)))
     }
-    HiddenArg(_) => fail("hidden argument should not be inferred individually!")
+    HiddenArg(r, _, _) => {
+      fail("at \{r}, hidden argument should not be inferred individually!")
+    }
     Lam(UntypedBinding((_, x, h)), t) => {
       // \ x : ?a .t
       // TODO: In presence of a universe hierarchy, we should
