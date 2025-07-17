@@ -4,8 +4,10 @@
     "Yoorkin/ArgParser",
     "moonbitlang/x/sys",
     "moonbitlang/x/fs",
-    "floatshadow/rowmltt/syntax",
+    "floatshadow/rowmltt/syntax/concrete",
     "floatshadow/rowmltt/lexer",
-    "floatshadow/rowmltt/parser"
+    "floatshadow/rowmltt/parser",
+    "floatshadow/rowmltt/typer",
+    "floatshadow/rowmltt/util"
   ]
 }

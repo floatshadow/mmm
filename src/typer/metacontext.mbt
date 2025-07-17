@@ -1,35 +1,51 @@
 ///|
+typealias @hashmap.T as MutMap
+
+///|
 pub enum MetaEntry {
-  Solved(Value, TypeVal)
-  Unsolved(TypeVal)
+  Solved(mty~ : TypeVal, Value)
+  Unsolved(mty~ : TypeVal)
 } derive(Show)
 
 // Global meta variable environment.
+
 ///|
-pub struct MetaEnv {
-  mut next_meta : Int
-  metas : @hashmap.T[MetaVar, MetaEntry]
+let next_meta : Ref[Int] = Ref::new(0)
+
+///|
+let metas : MutMap[MetaVar, MetaEntry] = @hashmap.new()
+
+///|
+pub fn lookup_meta(mv : MetaVar) -> MetaEntry? {
+  metas.get(mv)
 }
 
 ///|
-pub fn MetaEnv::new() -> MetaEnv {
-  MetaEnv::{ next_meta: 0, metas: @hashmap.new() }
+pub fn get_menv() -> MutMap[MetaVar, MetaEntry] {
+  metas
 }
 
 ///|
-pub fn MetaEnv::reset(self : MetaEnv) -> Unit {
-  self.next_meta = 0
-  self.metas.clear()
+pub fn unsolved_metas() -> Array[(MetaVar, TypeVal)] {
+  let unsolved = []
+  for meta_info in metas {
+    let (mv, entry) = meta_info
+    match entry {
+      MetaEntry::Unsolved(mty~) => unsolved.push((mv, mty))
+      _ => ()
+    }
+  }
+  unsolved
 }
 
 ///|
-pub fn MetaEnv::next_meta(self : MetaEnv) -> MetaVar {
-  let meta = self.next_meta
-  self.next_meta += 1
-  MetaVar(meta)
-}
-
-///|
-pub fn MetaEnv::find(self : MetaEnv, mv : MetaVar) -> MetaEntry? {
-  self.metas.get(mv)
+pub fn pretty_menv(logger : @util.IndentLogger) -> Unit {
+  logger.write_string("Θ = ")
+  for meta_info in metas {
+    let (mv, entry) = meta_info
+    match entry {
+      Solved(mty~, val) => logger.write_string("\{mv} = \{val} : \{mty}, ")
+      Unsolved(mty~) => logger.write_string("\{mv} : \{mty} (unsolved), ")
+    }
+  }
 }

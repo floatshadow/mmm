@@ -1,0 +1,39 @@
+-- gist.github.com/Guest0x0/e94d30077519ff9c64d6317035833461
+
+postulate
+  Nat  : Set
+  zero : Nat
+  suc  : Nat -> Nat
+
+  Bool : Set
+  tt   : Bool
+  ff   : Bool
+  if   : (A : Set) -> Bool -> A -> A -> A
+
+  Vec  : Set -> Nat -> Set
+
+  nil  : (A : Set) -> Vec A zero
+  cons : (A : Set) -> (n : Nat) -> A -> Vec A n -> Vec A (suc n)
+
+  Eq   : (A : Set) -> A -> A -> Set
+  refl : (A : Set) -> (a : A) -> Eq A a a
+
+
+-- boolean and
+ex1 : Bool -> Bool -> Bool
+ex1 = \x. \y. if Bool x y ff
+
+-- function application
+ex2 : (A : Set) -> (B : A -> Set) -> (f : (x : A) -> B x) -> (a : A) -> B a
+ex2 = \A. \B. \f. \a. f a
+
+-- expression equality judgement
+id : (A : Set) -> A -> A
+id = \A. \a. a 
+
+ex3 : (n : Nat) -> Eq Nat (id Nat n) n
+ex3 = \n. refl Nat n
+
+-- function equality judgement
+ex4 : (A : Set) -> Eq (A -> A) (id A) (ex2 A (\x. A) (id A)) 
+ex4 = \A. refl (A -> A) (id A)

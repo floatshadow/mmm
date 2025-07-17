@@ -1,212 +1,234 @@
 %{
-typealias Declaration = @syntax.Declaration
-typealias Cmd = @syntax.Cmd
-typealias Name = @syntax.Name
-typealias Expr = @syntax.Expr
-typealias Imp = @syntax.Imp
-typealias Pattern = @syntax.Pattern
-typealias Clause = @syntax.Clause
-typealias TypedBinding = @syntax.TypedBinding
-typealias Type = @syntax.Type
-typealias Telescope = @syntax.Telescope
+typealias @syntax.Name
+typealias @concrete.Declaration
+typealias @concrete.Expr
+typealias @concrete.WhereClause
+typealias @concrete.TypedBinding
+typealias @concrete.UntypedBinding
+typealias @concrete.Type
+typealias @concrete.Telescope
+typealias @util.Loc
+typealias @util.Interval
+typealias @util.Range
+traitalias @util.HasRange
+typealias @util.List1
+typealias @util.Either
 %}
-
 
 %derive<Show> Token
 %derive<Show> ParseError
-%position<Int>
-%start start
+%position<Loc>
+%start parse_file
 
-%token EOF
-%token<Int> NUMBER
+%token Eof
+%token VOpen
+%token VSemi
+%token VClose
+%token <(Loc, String)> ErrorMsg
 
-%token LPAREN       "("
-%token RPAREN       ")"
-%token LREC         "["
-%token RREC         "]"
-%token LCURLY       "{"
-%token RCURLY       "}"
-%token COLON        ":"
-
-%token LAMBDA       "\"
-
-%token EQ           "="
-%token QM           "?"
-%token ARROW        "->"
-
-%token CMD          "--:"
-%token DOT          "."
-%token DEFN         "::="
-%token BAR         "|"
-
-%token KW_SET       "Set"
-%token KW_LET       "let"
-%token KW_IN        "in"
-%token KW_DATA      "data"
-%token KW_WHERE     "where"
-%token KW_NORM      "normalize"
-%token KW_INFER     "infertype"
-%token KW_CHECK     "checkctx"
-%token KW_MUTUAL    "mutual"
-%token KW_END    "end"
-
-%token NEWLINE
-
-%token PLACEHOLDER
-%token<String> IDENT
-
-%type<Array[Declaration]> start
-%type<Array[Declaration]> defs
-
-%type<TypedBinding> typebinding
-
-%type<Declaration> decl
-%type<Declaration> fundef
-%type<Declaration> datadef
-%type<Declaration> mutual
-
-%type<Cmd> command
+%token<(Interval, String)> Identifier
+%token<(Interval, Int)> IntLiteral
 
 
-%type<Expr> expr
+%token<Interval> SymOpenParen       "("
+%token<Interval> SymCloseParen      ")"
+%token<Interval> SymOpenBrace       "{"
+%token<Interval> SymCloseBrace      "}"
+%token<Interval> SymColon           ":"
+%token<Interval> SymLambda          "\\"
+%token<Interval> SymEqual           "="
+%token<Interval> SymArrow           "->"
+%token<Interval> SymDot             "."
+%token<Interval> SymUnderscore      "_"
 
-%type<Expr> expr_var
-%type<Expr> expr_set
-%type<Expr> expr_pi
-%type<Expr> expr_lam
-%type<Expr> expr_app
-%type<Expr> expr_let
-%type<Expr> expr_nonapp
-
-//%type<Expr> expr_meta
-//%type<Expr> expr_imeta
-//%type<Expr> expr_srcpos
-
-%type<Pattern> pat
-%type<Array[Pattern]> pats
-
-%type<Clause> clause
-%type<Array[Clause]> clauses
-%type<Array[(Name, Type)]> nametypes
-
-%type<Telescope> tele
+%token<Interval> KwSet       "Set"
+%token<Interval> KwMutual    "mutual"
+%token<Interval> KwPostulate "postulate"
+%token<Interval> KwData      "data"
+%token<Interval> KwWhere     "where"
+%token<Interval> KwNorm      "NORMALIZE"
+%token<Interval> KwInfer     "INFER"
+%token<Interval> KwCheck     "CHECK"
 
 
-%right ARROW
+
+%type<Array[Declaration]> parse_file
+%type<Array[Declaration]> TopDeclarations
+%type<List1[Declaration]> Declarations
+%type<Array[Declaration]> Declarations0
+%type<List1[Declaration]> Declarations1
+
+%type<TypedBinding> TypedBinding
+%type<UntypedBinding> UntypedBinding
+%type<Telescope> Telescope
+
+%type<Name> Id
+%type<Name> BId
+%type<Expr> Expr
+%type<Expr> Expr1
+%type<Expr> Expr2
+%type<Expr> Expr3
+%type<List1[Expr]> Application
+%type<List1[Expr]> Application3 
+
+%type<Declaration> Declaration
+%type<Declaration> FunDefOrTypeSig
+%type<Declaration> DataDef
+%type<Declaration> Mutual
+%type<Declaration> Postulate
+%type<Either[Expr, Type]> RHSOrTypeSig
+%type<WhereClause> WhereClause
+%type<Declaration> Cmd
+
+
+%right "->" 
 
 %%
 
-start
-  : defs EOF                 { $1 }
-  ;
- 
-defs
-  :                               { [] }
-  | NEWLINE defs                  { $2 }
-  | decl NEWLINE defs             { [$1] + $3 }
+
+
+parse_file
+  : VSemi TopDeclarations Eof  { $2 }
   ;
 
-decl
-  : command                          { Command($1) }
-  | fundef                           { $1 }
-  | datadef                           { $1 }
-  | mutual                           { $1 }
+(* top level: Arbitrary declarations *)
+Declarations
+  : VOpen Declarations1 VClose       { $2 }
   ;
 
-command
-  : CMD KW_CHECK                      { CheckCtx }
-   |CMD KW_INFER IDENT                      { InferType($3) }
-  | CMD KW_NORM expr                      { Normalize($3) }
+Declarations0
+  : VOpen VClose                     { [] }
+  | Declarations                     { $1.to_array() }
   ;
 
 
-expr
-  : expr_nonapp  { $1 }
-  | expr_app  { $1 }
+Declarations1
+  : Declaration VSemi Declarations1  { $3.cons($1) }
+  | Declaration                      { List1::singleton($1) }
   ;
 
-expr_nonapp
-  : expr_var  { $1 }
-  | expr_set  { $1 }
-  | expr_pi  { $1 }
-  | expr_lam  { $1 }
-  | expr_let  { $1 }
-  | "(" expr ")" { $2 }
+(* Top level declarations *)
+TopDeclarations
+  :                                  { [] }
+  | Declarations1                    { $1.to_array() }
   ;
 
-expr_var
-  : IDENT   { Expr::Var($1) }
+(* declarations or commands *)
+Declaration
+  : Cmd                              { $1 }
+  | FunDefOrTypeSig                  { $1 }
+  | DataDef                          { $1 }
+  | Mutual                           { $1 }
+  | Postulate                        { $1 }
   ;
 
-expr_set
-  : KW_SET NUMBER  { Expr::Set($2) }
+Cmd
+  : KwCheck                          { Command(NoRange, CheckCtx) }
+  | KwInfer BId                      { Command(NoRange, InferType($2)) }
+  | KwNorm Expr                      { Command(NoRange, Normalize($2)) }
   ;
 
-expr_pi
-  : typebinding ARROW expr { Expr::Pi($1, $3) }
+
+Id
+  : Identifier                       { Name::new(HasRange::get_range($1.0), $1.1) }
   ;
 
-expr_lam
-  : LAMBDA IDENT "." expr  { Expr::Lam($2, Imp::Explicit, $4) }
+(* BId is an identifier that can be used as a binding *)
+BId
+  : Id                               { $1 }
+  | "_"                              { Name::new(HasRange::get_range($1), "_") }
   ;
 
-expr_app
-  : expr_nonapp expr  { Expr::App($1, $2, Imp::Explicit) }
-  | expr "{" expr "}"  { Expr::App($1, $3, Imp::Implicit) }
+(* Top level, function types *)
+Expr
+  : TypedBinding "->" Expr           { Pi($1, $3) }
+  | Application3 "->" Expr           { Pi(TypedBinding((HasRange::get_range($1), Name::new(NoRange, "_"), NotHiding, raw_application($1))), $3) }
+  | Expr1                            { $1 }
   ;
 
-expr_let
-  : KW_LET IDENT ":" expr "=" expr KW_IN expr { Expr::Let(($2, $4), $6, $8) }
+
+(* Level 1 : Application *)
+Expr1
+  : Application                      { raw_application($1) }
+  | Application3                     { raw_application($1) }
   ;
 
-pats
+(* applicaton without `with` *)
+Application
+  : Expr2                            { List1::singleton($1) }
+  | Expr3 Application                { $2.cons($1) }
+  ;
+
+
+(* Level 2 : Lambda *)
+Expr2
+  : "\\" UntypedBinding Expr         { Lam($2, $3) }
+  | Expr3                            { $1 }
+  ;
+
+
+(* Level 3 : Atoms *)
+Expr3
+  : "{" BId "=" Expr "}"             { HiddenArg(Range::merge_range5($1, $2, $3, $4, $5), Some($2), $4) }
+  | "{" Expr "}"                     { HiddenArg(Range::merge_range3($1, $2, $3), None, $2) }
+  | "_"                              { Hole(HasRange::get_range($1)) }
+  | "." Expr3                        { Dot(Range::merge_range($1, $2), $2) }
+  | Id                               { Ident($1) }
+  | "Set" level=IntLiteral           { Set(Range::merge_range($1, level.0), level.1) }
+  | "Set"                            { Set(HasRange::get_range($1), 0) }
+  | "(" Expr ")"                     { $2 }
+  ;
+
+(* application within `with` *)
+Application3
+  : Expr3                            { List1::singleton($1) }
+  | Expr3 Application3               { $2.cons($1) }
+
+
+UntypedBinding
+  :  BId  "."                        { UntypedBinding((HasRange::get_range($1), $1, NotHiding)) }
+  | "{" BId "}" "."                  { UntypedBinding((Range::merge_range3($1, $2, $3), $2, Hiding)) }
+  ;
+
+
+TypedBinding
+  : "(" BId ":" Expr ")"             { TypedBinding((Range::merge_range5($1, $2, $3, $4, $5), $2,  NotHiding, $4)) }
+  | "{" BId ":" Expr "}"             { TypedBinding((Range::merge_range5($1, $2, $3, $4, $5), $2,  Hiding,    $4)) }
+  | "(" Expr ")"                     { TypedBinding((Range::merge_range3($1, $2, $3), Name::new(NoRange, "_"), NotHiding, $2)) }
+  | "{" Expr "}"                     { TypedBinding((Range::merge_range3($1, $2, $3), Name::new(NoRange, "_"), Hiding,    $2)) }
+  ;
+
+Telescope
   :  { [] }
-  | pat pats { [$1] + $2 }
+  |  Telescope TypedBinding          { $1.push($2); $1 }
   ;
 
-pat
-  : IDENT {PVar($1)}
-  | "(" IDENT pats ")" {PCon($2, $3)}
-  | "." "(" expr ")" {PDot($3)}
+
+
+FunDefOrTypeSig
+  :  Expr1 RHSOrTypeSig WhereClause  { funclause_or_typesig($1, $2, $3) }
   ;
 
-clause
-  : IDENT pats "=" expr  { Clause::{lhs_head : $1, lhs_pats : $2, rhs: $4} }
+
+RHSOrTypeSig
+  : "=" Expr         { Left($2) }
+  | ":" Expr         { Right($2) }
   ;
 
-clauses 
-  :  { [] }
-  |  NEWLINE clauses { $2 }
-  |  "|" clause clauses { [$2] + $3 }
+WhereClause
+  :                               { NoWhere }
+  | "where" Declarations0         { Where(HasRange::get_range($1), $2) }
   ;
 
-fundef
-  : IDENT ":" expr clauses KW_END { FunDef($1, $3, $4) }
+DataDef
+  : "data" BId Telescope ":" Expr "where" Declarations0 { DataDef(HasRange::get_range($1), $2, $3, $5, $7) }
   ;
 
-mutual
-  : KW_MUTUAL "{" defs "}"  { Mutual($3) }
+Mutual
+  : "mutual" Declarations0  { Mutual(HasRange::get_range($1), $2) }
   ;
 
-typebinding
-  : "(" IDENT ":" expr ")"  { (Some($2), Imp::Explicit, $4) }
-  | "{" IDENT ":" expr "}"  { (Some($2), Imp::Implicit, $4) }
-  | "(" expr ")"  { (None, Imp::Explicit, $2) }
-  | "{" expr "}"  { (None, Imp::Implicit, $2) }
-  | expr  { (None, Imp::Implicit, $1) }
+Postulate
+  : "postulate" Declarations0 { Postulate(HasRange::get_range($1), $2) }
   ;
 
-tele
-  :  { [] }
-  |  typebinding tele { [$1] + $2 }
-  ;
-
-datadef
-  : KW_DATA IDENT tele ":" expr KW_WHERE nametypes KW_END { DataDef($2, $3, $5, $7) }
-  ;
-
-nametypes
-  :  { [] }
-  |  NEWLINE nametypes { $2 }
-  |  "|" IDENT ":" expr nametypes { [($2, $4)] + $5 }
-  ;

@@ -1,0 +1,27 @@
+// [parser] parsed test/inductive.tt successfully
+// [parser] data Nat  : Set 0 where
+  zero : Nat
+  suc : (_ : Nat)  -> Nat
+
+data List (A : Set 0)  : Set 0 where
+  nil : (List) (A) 
+  cons : (_ : A)  -> (_ : (List) (A) )  -> (List) (A) 
+
+data Vec (A : Set 0)  : (_ : Nat)  -> Set 0 where
+  vnil : (Vec) (A) (zero) 
+  vcons : {n : Nat}  -> (_ : A)  -> (_ : (Vec) (A) (n) )  -> (Vec) (A) ((suc) (n) ) 
+
+id : {A : Set 0}  -> (_ : A)  -> A
+(id) (x)  = x
+:NORMALIZE id
+:CHECK CTX
+plus : (_ : Nat)  -> (_ : Nat)  -> Nat
+(plus) (zero) (n)  = n
+(plus) ((suc) (m) ) (n)  = (suc) ((plus) (m) (n) ) 
+:INFER plus
+append : {A : _}  -> {n : Nat}  -> {m : Nat}  -> (_ : (Vec) (A) (n) )  -> (_ : (Vec) (A) (m) )  -> (Vec) (A) ((plus) (m) (n) ) 
+(append) (vnil) (w)  = w
+(append) ((vcons) (x) (xs) ) (w)  = (vcons) (x) ((append) (xs) (w) ) 
+_ : (Vec) (Nat) ((suc) ((suc) ((suc) (zero) ) ) ) 
+_ = (append) ((vcons) (zero) (vnil) ) ((vcons) ((suc) (zero) ) ((vcons) ((suc) ((suc) (zero) ) ) (vnil) ) ) 
+

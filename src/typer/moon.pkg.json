@@ -1,6 +1,9 @@
 {
     "import": [
       "floatshadow/rowmltt/syntax",
-      "floatshadow/rowmltt/util"
+      "floatshadow/rowmltt/syntax/concrete",
+      "floatshadow/rowmltt/syntax/abstract",
+      "floatshadow/rowmltt/util",
+      "moonbitlang/yacc/tests/calc_jsoncst_test"
     ]
 }

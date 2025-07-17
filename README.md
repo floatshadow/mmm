@@ -1,16 +1,17 @@
-# RowMLTT
+# Mini MLTT Machine
 
-RowMLTT is a Agda-like, dependently typed toy language.
+Mini MLTT Machine (mmm) is a Agda-like, dependently typed toy language.
 
 ## Features
 
-- [x] typed NbE for eta-equality
 - [ ] inductive data type and pattern matching
-- [ ] holes and implicit arguments
+- [x] holes and implicit arguments
 - [ ] dependent pattern matching
-- [ ] row polymorphism 
 
 ## References
+
+Indentation Sensitive Lexical Analysis:
+  - [Agda](https://github.com/agda/agda/blob/master/src/full/Agda/Syntax/Parser/Layout.hs)
 
 Bidirectional Type Inference:
   - [Bidirectional Typing Rules: A Tutorial](https://davidchristiansen.dk/tutorials/bidirectional.pdf), Christiansen.
@@ -37,3 +38,5 @@ Codebases:
   - [blott](https://github.com/jozefg/blott/), Gratzer and Sterling.
   - [minimal MLTT implementation step-by-step](https://gist.github.com/Guest0x0/e94d30077519ff9c64d6317035833461), Guest0x0.
   - [elaboration-zoon](https://github.com/AndrasKovacs/elaboration-zoo), Kovács.
+  - [ShiTT](https://github.com/KonjacSource/ShiTT), KonjacSource.
+  - [Mini Moonbit Machine](https://github.com/Mini-Moonbit-Machine/mmm), waterlens and flaotshadow.
