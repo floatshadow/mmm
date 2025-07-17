@@ -10,7 +10,9 @@ typealias @syntax.Bounding
 ///|
 typealias @syntax.DBlvl
 
+///|
 typealias @syntax.NamedArg
+
 ///|
 typealias @util.Range
 
@@ -41,7 +43,7 @@ pub fn TyCtx::new() -> TyCtx {
 pub fn TyCtx::add_binding_var(
   self : TyCtx,
   name : String,
-  ty : TypeVal
+  ty~ : TypeVal
 ) -> TyCtx {
   let value = VNe(Neutral::vvar(self.lvl()))
   {
@@ -130,8 +132,8 @@ fn Typer::insert_hiding_app_unchecked(
       VPi(_, Hiding, a, b) => {
         let m = self.fresh_meta(ctx, a)
         let mv = eval(ctx.values, ctx.sig, m)
-        self.tracer.log("insert hiding app \{t.to_pretty()} {\{mv}}")
-        go(App(t, m, Hiding), b(mv))
+        let b_val = b(mv)
+        go(App(t, m, Hiding), b_val)
       }
       _ => (t, a_val)
     }
@@ -220,7 +222,7 @@ pub fn Typer::check(
     // Γ  ⊢  λx. t ⇐ (x : A) -> B[x] ⇝ λx. t'
     (Lam(UntypedBinding((_, x, h1)), t), VPi(_, h2, a, b)) if h1 == h2 => {
       let x = x.to_raw_name()
-      let ctx2 = ctx.add_binding_var(x, a)
+      let ctx2 = ctx.add_binding_var(x, ty=a)
       let t = self.check(ctx2, t, b(VNe(Neutral::vvar(ctx.lvl()))))
       Lam(UntypedBinding((x, h1)), t)
     }
@@ -229,7 +231,7 @@ pub fn Typer::check(
     // ------------------------------------------
     // Γ  ⊢ t ⇐ {x : A} -> B[x] ⇝ λx. t'
     (t, VPi(x, Hiding, a, b)) => {
-      let ctx2 = ctx.add_binding_var(x, a)
+      let ctx2 = ctx.add_binding_var(x, ty=a)
       let t = self.check(ctx2, t, b(VNe(Neutral::vvar(ctx.lvl()))))
       Lam(UntypedBinding((x, Hiding)), t)
     }
@@ -239,8 +241,8 @@ pub fn Typer::check(
     // -------------------
     // Γ  ⊢ e ⇐ A
     (t, expected_tyval) => {
-      self.tracer.log(" check mode ↪ infer mode")
-      let (t, infer_tyval) = self.infer(ctx, t)
+      self.tracer.log("  check mode ↪ infer mode")
+      let (t, infer_tyval) = self.insert_hiding_app(ctx, self.infer(ctx, t))
       // check if inferred type is equal to given type
       self.unify_err(
         ctx.values,
@@ -317,7 +319,11 @@ pub fn Typer::infer(
             (e1, HiddenArg(r, x, e2), Nil) =>
               break @concrete.App(NoRange, e1, NamedArg((r, x, Hiding, e2)))
             (e1, e2, Nil) =>
-              break @concrete.App(NoRange, e1, NamedArg((NoRange, None, NotHiding, e2)))
+              break @concrete.App(
+                NoRange,
+                e1,
+                NamedArg((NoRange, None, NotHiding, e2)),
+              )
             (e1, HiddenArg(r, x, e2), Cons(e3, es3)) =>
               continue (
                   @concrete.App(NoRange, e1, NamedArg((r, x, Hiding, e2))),
@@ -326,7 +332,11 @@ pub fn Typer::infer(
                 )
             (e1, e2, Cons(e3, es3)) =>
               continue (
-                  @concrete.App(NoRange, e1, NamedArg((NoRange, None, NotHiding, e2))),
+                  @concrete.App(
+                    NoRange,
+                    e1,
+                    NamedArg((NoRange, None, NotHiding, e2)),
+                  ),
                   e3,
                   es3,
                 )
@@ -335,7 +345,8 @@ pub fn Typer::infer(
       self.infer(ctx, apps)
     }
     App(_, t, u) => {
-      let (t, t_tyval, u, h) : (Expr, TypeVal, @concrete.Expr, Hiding) = match u {
+      let (t, t_tyval, u, h) : (Expr, TypeVal, @concrete.Expr, Hiding) = match
+        u {
         NamedArg((_, None, Hiding, u)) => {
           let (t, t_tyval) = self.infer(ctx, t)
           (t, t_tyval, u, Hiding)
@@ -347,14 +358,14 @@ pub fn Typer::infer(
           )
           (t, t_tyval, u, NotHiding)
         }
-        NamedArg((r, Some(x), _, _)) => {
-          fail(
-            "at \{r}, do not named hidden argument \{x}"
-          )
-        }
+        NamedArg((r, Some(x), _, _)) =>
+          fail("at \{r}, do not named hidden argument \{x}")
       }
-      // ensure t is of Pi type
-      let (a, b) = match force_meta(ctx.values, ctx.sig, t_tyval) {
+      let (
+        a,
+        // ensure t is of Pi type
+        b,
+      ) = match force_meta(ctx.values, ctx.sig, t_tyval) {
         VPi(_, h2, a, b) => {
           guard h == h2 else {
             fail("In \{expr.to_pretty()}, hiding mismatch: \{h} != \{h2}")
@@ -365,8 +376,8 @@ pub fn Typer::infer(
           // TODO: In presence of a universe hierarchy, we should
           // insert a fresh level metavariable ?l with ?a : Set(?l) and ?l' with b[x] : Set(?l')
           let a = eval(ctx.values, ctx.sig, self.fresh_meta(ctx, VSet(0)))
-          fn b_tyval(a : TypeVal) -> TypeVal raise Failure {
-            let ctx2 = ctx.add_binding_var("x", a)
+          fn b_tyval(x_val : Value) -> TypeVal raise Failure {
+            let ctx2 = ctx.add_definition_var("x", x_val, ty=a)
             let b = self.fresh_meta(ctx2, VSet(0))
             eval(ctx2.values, ctx2.sig, b)
           }
@@ -384,20 +395,18 @@ pub fn Typer::infer(
       let u = self.check(ctx, u, a)
       (App(t, u, h), b(eval(ctx.values, ctx.sig, u)))
     }
-    HiddenArg(r, _, _) => {
+    HiddenArg(r, _, _) =>
       fail("at \{r}, hidden argument should not be inferred individually!")
-    }
     Lam(UntypedBinding((_, x, h)), t) => {
       // \ x : ?a .t
       // TODO: In presence of a universe hierarchy, we should
       // insert a fresh level metavariable ?l with ?a : Set(?l)
       let a = eval(ctx.values, ctx.sig, self.fresh_meta(ctx, VSet(0)))
       let x = x.to_raw_name()
-      let ctx2 = ctx.add_binding_var(x, a)
+      let ctx2 = ctx.add_binding_var(x, ty=a)
       let (t, b) = self.insert_hiding_app(ctx2, self.infer(ctx2, t))
-      println("inserted hiding app: \{t.to_pretty()}")
-      fn b_tyval(a : TypeVal) -> TypeVal raise Failure {
-        let ctx2 = ctx.add_binding_var(x, a)
+      fn b_tyval(x_val : Value) -> TypeVal raise Failure {
+        let ctx2 = ctx.add_definition_var(x, x_val, ty=a)
         let b = readback(ctx2.values, ctx2.sig, ctx2.lvl(), b)
         eval(ctx2.values, ctx2.sig, b)
       }
@@ -411,7 +420,7 @@ pub fn Typer::infer(
       let x = x.to_raw_name()
       let (a, a_univ) = self.check_expr_is_type(ctx, a)
       let a_val = eval(ctx.values, ctx.sig, a)
-      let ctx2 = ctx.add_binding_var(x, a_val)
+      let ctx2 = ctx.add_binding_var(x, ty=a_val)
       let (b, b_univ) = self.check_expr_is_type(ctx2, b)
       // TODO : temporarily rollback to type in type
       (Pi(TypedBinding((x, h, a)), b), VSet(0))
@@ -522,7 +531,7 @@ fn Typer::check_telescope(
         let (a, a_univ) = self.check_expr_is_type(ctx, a)
         let a_val = eval(ctx.values, ctx.sig, a)
         binds.push((x, a_val, a_univ))
-        ctx2 = ctx2.add_binding_var(x, a_val)
+        ctx2 = ctx2.add_binding_var(x, ty=a_val)
       }
     }
   }
@@ -671,9 +680,4 @@ pub fn alpha_equiv(e1 : Expr, e2 : Expr) -> Bool {
       alpha_equiv(f1, f2) && alpha_equiv(a1, a2)
     _ => false
   }
-}
-
-///|
-pub struct PrettyTyCtx {
-  ctx : TyCtx
 }
