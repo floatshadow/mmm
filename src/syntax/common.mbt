@@ -53,7 +53,8 @@ pub fn[A, B] NamedArg::fmap(
   }
 }
 
-pub impl [T : Show] Show for NamedArg[T] with output(self, logger) {
+///|
+pub impl[T : Show] Show for NamedArg[T] with output(self, logger) {
   match self {
     NamedArg((_, Some(x), Hiding, e)) => {
       logger.write_string("{\{x} = ")
@@ -72,7 +73,6 @@ pub impl [T : Show] Show for NamedArg[T] with output(self, logger) {
     NamedArg((_, None, NotHiding, e)) => Show::output(e, logger)
   }
 }
-
 
 ///|
 pub typealias @immut/hashmap.T[String, String] as NameMap

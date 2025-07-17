@@ -4,6 +4,7 @@ typealias @syntax.Name
 ///|
 typealias @syntax.Hiding
 
+///|
 typealias @syntax.NamedArg
 
 ///| (x : e) or {xs : e}
@@ -234,6 +235,7 @@ pub fn Expr::to_pretty(self : Expr) -> PrettyExpr {
   PrettyExpr::{ syntax: self }
 }
 
+///|
 pub impl Show for Expr with output(self, logger) {
   let logger = @util.IndentLogger::new(logger)
   PrettyExpr::print_one_level(logger, self)
