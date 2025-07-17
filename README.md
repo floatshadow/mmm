@@ -1,11 +1,11 @@
-# MLTT
+# Mini MLTT Machine
 
-MLTT is a Agda-like, dependently typed toy language.
+Mini MLTT Machine (mmm) is a Agda-like, dependently typed toy language.
 
 ## Features
 
-- [x] inductive data type and pattern matching
-- [ ] holes and implicit arguments
+- [ ] inductive data type and pattern matching
+- [x] holes and implicit arguments
 - [ ] dependent pattern matching
 
 ## References
