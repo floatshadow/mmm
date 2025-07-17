@@ -172,8 +172,9 @@ fn PrettyExpr::print_one_level(
           logger.write_string("}")
         }
         NotHiding => {
-          logger.write_string(" ")
+          logger.write_string(" (")
           PrettyExpr::print_one_level(logger, arg)
+          logger.write_string(")")
         }
       }
     }

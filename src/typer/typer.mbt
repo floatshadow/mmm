@@ -361,11 +361,9 @@ pub fn Typer::infer(
         NamedArg((r, Some(x), _, _)) =>
           fail("at \{r}, do not named hidden argument \{x}")
       }
-      let (
-        a,
-        // ensure t is of Pi type
-        b,
-      ) = match force_meta(ctx.values, ctx.sig, t_tyval) {
+
+      // ensure t is of Pi type
+      let (a, b) = match force_meta(ctx.values, ctx.sig, t_tyval) {
         VPi(_, h2, a, b) => {
           guard h == h2 else {
             fail("In \{expr.to_pretty()}, hiding mismatch: \{h} != \{h2}")
@@ -582,6 +580,7 @@ fn Typer::check_funclause(
   let (lhs_head, lhs_pats) = match lhs {
     PIdent(f) => (f, List::Nil)
     PRawApp(_, Cons(PIdent(f), p, ps)) => (f, List::Cons(p, ps))
+    PWild(r) => (Name::new(r, "_"), List::Nil)
     _ => fail("cannot parse the left hand side \{lhs} of function clause")
   }
   if not(ctx.sig.constants.contains(lhs_head.to_raw_name())) {

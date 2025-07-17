@@ -1,0 +1,99 @@
+-- Example from elabration zoo 04-implicit
+
+id : {A : Set} -> A -> A
+id = \x. x   -- elaborated to \{A} x. x
+
+const : {A : _} -> {B : _} -> A -> B -> A
+const = \x. \y. x
+
+
+-- apply implicit arguments explicitly
+the : (A : _) -> A -> A
+the = \_. \x. x
+
+argTest1 : _
+argTest1 = const {Set} {Set} Set
+
+
+
+id2 : {A : _} -> A -> A
+id2 = \{A}. \x. x
+
+-- Here the output rhs is \{A}. id {A}. First, we insert \{A}, then we apply id to {?n},
+-- and ?n is solved to A a bit later.
+insert : {A : _} -> A -> A
+insert = id
+
+-- Here we don't insert, because rhs is already an implicit lambda.
+noinsert : _
+noinsert = \{A}. \x. the A x
+
+-- Here we insert, because although we already have an implicit lambda, it is applied
+-- explicitly to something.
+insert2 : _ 
+insert2 = (\{A}. \x. the A x) Set  -- (\{A}. \x. the A x) {Set} Set
+
+
+--------------------------------------------------------------------------------
+
+-- bool
+Bool : Set
+Bool = (B : _) -> B -> B -> B
+
+true : Bool
+true = \B. \t. \f. t
+
+false : Bool
+false = \B. \t. \f. f
+
+not : Bool -> Bool
+not = \b. \B. \t. \f. b B f t
+
+-- lists
+List : Set -> Set
+List = \A. (L : _) -> (A -> L -> L) -> L -> L
+
+nil : {A : _} -> List A
+nil = \L. \cons. \nil. nil
+
+cons : {A : _} -> A -> List A -> List A
+cons  = \x. \xs. \L. \cons. \nil. cons x (xs L cons nil)
+
+map : {A : _} -> {B : _} -> (A -> B) -> List A -> List B
+map = \{A}. \{B}. \f. \xs. \L. \c. \n. xs L (\a. c (f a)) n
+
+list1 : List Bool
+list1 = cons true (cons false (cons true nil))
+
+-- dependent function composition
+comp : {A : _} -> {B : A -> Set} -> {C : {a : _} -> B a -> Set} -> (f : {a : _} -> (b : B a) -> C b) -> (g : (a : A) -> B a) -> (a : A) -> C (g a)
+comp = \f. \g. \a. f (g a)
+
+compExample : _
+compExample = comp (cons true) (cons false) nil
+
+-- nat
+Nat : Set
+Nat = (N : Set) -> (N -> N) -> N -> N
+
+mul : Nat -> Nat -> Nat
+mul = \a. \b. \N. \s. \z. a _ (b _ s) z
+
+ten : Nat
+ten = \N. \s. \z. s (s (s (s (s (s (s (s (s (s z)))))))))
+
+hundred : _
+hundred = mul ten ten
+
+-- Leibniz equality
+Eq : {A : _} -> A -> A -> Set
+Eq = \{A}. \x. \y. (P : A -> Set) -> P x -> P y
+
+refl : {A : _} -> {x : A} -> Eq x x
+refl = \_. \px. px
+
+sym : {A : _} -> {x : _} -> {y : _} -> Eq {A} x y -> Eq y x
+sym = \{A}. \{x}. \{y}. \p. p (\y. Eq y x) refl
+
+_ : _
+_ = the (Eq (mul ten ten) hundred) refl

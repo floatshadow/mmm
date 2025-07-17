@@ -102,7 +102,7 @@ fn eval_app(
     VLam(_, h, t) => {
       guard h == vh else {
         fail(
-          "expected an \{h} argument but an \{vh} argument applies in 'eval_app'",
+          "function \{f} expected an \{h} argument but an \{vh} argument \{v} applies in 'eval_app'",
         )
       }
       t(v)

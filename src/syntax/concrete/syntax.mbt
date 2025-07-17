@@ -263,8 +263,7 @@ fn PrettyExpr::print_one_level(
       for e in es {
         logger.write_string("(")
         PrettyExpr::print_one_level(logger, e)
-        logger.write_string(")")
-        logger.write_string(" ")
+        logger.write_string(") ")
       }
     App(_, e1, e2) => {
       logger.write_string("(")
@@ -314,7 +313,6 @@ pub impl Show for Pattern with output(self, logger) {
         logger.write_string("(")
         Show::output(p, logger)
         logger.write_string(")")
-        logger.write_string(" ")
       }
     PIdent(x) => logger.write_string("\{x}")
   }

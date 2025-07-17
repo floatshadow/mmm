@@ -185,7 +185,7 @@ fn Typer::solve(
   let pren = inverse(env, sig, lvl, spine)
   let rhs = rename(mv, pren, rhs)
   let mut lam = rhs
-  for delta_lvl, arg in spine.iter2() {
+  for delta_lvl, arg in spine.rev().iter2() {
     let (_, h) = arg
     lam = Lam(UntypedBinding(("x#\{delta_lvl}", h)), lam)
   }
