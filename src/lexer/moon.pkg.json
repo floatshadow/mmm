@@ -1,5 +1,8 @@
 {
   "import": [
+    "moonbitlang/core/strconv",
+    "moonbitlang/core/hashmap",
+    "moonbitlang/core/queue",
     "floatshadow/rowmltt/util",
     "floatshadow/rowmltt/parser"
   ]

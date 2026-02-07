@@ -1,5 +1,6 @@
 {
   "import": [
+    { "path": "moonbitlang/core/immut/hashmap", "alias": "immut_hashmap" },
     "floatshadow/rowmltt/util"
   ]
 }

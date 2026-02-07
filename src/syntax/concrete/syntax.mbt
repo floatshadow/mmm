@@ -1,31 +1,35 @@
 ///|
-typealias @syntax.Name
+using @syntax {type Name}
 
 ///|
-typealias @syntax.Hiding
+using @syntax {type Hiding}
 
 ///|
-typealias @syntax.NamedArg
-
-///| (x : e) or {xs : e}
-pub(all) type TypedBinding (Range, Name, Hiding, Type)
-
-///| \ x or \ {x}
-pub(all) type UntypedBinding (Range, Name, Hiding)
-
-///| (x : A) (y : B) (z : C) ... 
-pub typealias Array[TypedBinding] as Telescope
+using @syntax {type NamedArg}
 
 ///|
-pub(all) type MetaVar Int derive(Eq, Hash)
+/// (x : e) or {xs : e}
+pub(all) struct TypedBinding(Range, Name, Hiding, Type)
 
 ///|
-typealias @util.Range
+/// \ x or \ {x}
+pub(all) struct UntypedBinding(Range, Name, Hiding)
 
 ///|
-typealias @util.List2
+/// (x : A) (y : B) (z : C) ... 
+pub type Telescope = Array[TypedBinding]
 
 ///|
+pub(all) struct MetaVar(Int) derive(Eq, Hash)
+
+///|
+using @util {type Range}
+
+///|
+using @util {type List2}
+
+///|
+#alias(Type)
 pub(all) enum Expr {
   Ident(Name)
   Set(Range, Int) // Set i
@@ -37,9 +41,6 @@ pub(all) enum Expr {
   HiddenArg(Range, Name?, Expr) // {e} or {x = e}
   Dot(Range, Expr) // .p, only in patterns
 }
-
-///|
-pub typealias Expr as Type
 
 ///|
 pub(all) enum Pattern {
@@ -56,7 +57,8 @@ pub(all) enum WhereClause {
   Where(Range, Array[Declaration])
 }
 
-///| Top level declarations.
+///|
+/// Top level declarations.
 pub(all) enum Declaration {
   Mutual(Range, Array[Declaration]) // mutual definition
   TypeSig(Name, Type) // f : A
@@ -133,14 +135,14 @@ pub fn Pattern::to_expr(self : Pattern) -> Expr {
 ///|
 pub impl @util.HasRange for TypedBinding with get_range(self) {
   match self {
-    TypedBinding((r, _, _, _)) => r
+    TypedBinding(r, _, _, _) => r
   }
 }
 
 ///|
 pub impl @util.HasRange for UntypedBinding with get_range(self) {
   match self {
-    UntypedBinding((r, _, _)) => r
+    UntypedBinding(r, _, _) => r
   }
 }
 
@@ -193,7 +195,7 @@ pub impl @util.HasRange for Declaration with get_range(self) {
 ///|
 pub impl Show for TypedBinding with output(self, logger) {
   match self {
-    TypedBinding((_, x, imp, ty)) =>
+    TypedBinding(_, x, imp, ty) =>
       match imp {
         Hiding => {
           logger.write_string("{\{x} : ")
@@ -212,7 +214,7 @@ pub impl Show for TypedBinding with output(self, logger) {
 ///|
 pub impl Show for UntypedBinding with output(self, logger) {
   match self {
-    UntypedBinding((_, x, imp)) =>
+    UntypedBinding(_, x, imp) =>
       match imp {
         Hiding => logger.write_string("{\{x}}")
         NotHiding => logger.write_string("\{x}")
@@ -244,7 +246,7 @@ pub impl Show for Expr with output(self, logger) {
 ///|
 fn PrettyExpr::print_one_level(
   logger : @util.IndentLogger,
-  syntax : Expr
+  syntax : Expr,
 ) -> Unit {
   match syntax {
     Ident(x) => logger.write_string("\{x}")
@@ -343,7 +345,7 @@ pub fn Declaration::to_pretty(self : Declaration) -> PrettyDecl {
 ///|
 fn PrettyDecl::print_one_level(
   logger : @util.IndentLogger,
-  decl : Declaration
+  decl : Declaration,
 ) -> Unit {
   match decl {
     Postulate(_, ds) => {

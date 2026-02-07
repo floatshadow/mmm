@@ -11,7 +11,7 @@ pub fn Loc::empty() -> Loc {
 }
 
 ///|
-pub impl Eq for Loc with op_equal(self, other) {
+pub impl Eq for Loc with equal(self, other) {
   self.index == other.index
 }
 
@@ -123,7 +123,7 @@ pub impl[A : HasRange] HasRange for List1[A] with get_range(self) {
 pub fn[A : HasRange, B : HasRange] Range::merge_range(u : A, v : B) -> Range {
   letrec concate = fn(
     xs : ArrayView[Interval],
-    ys : ArrayView[Interval]
+    ys : ArrayView[Interval],
   ) -> Array[Interval] {
     let z = xs.to_array()
     z.append(ys.to_array())
@@ -133,11 +133,11 @@ pub fn[A : HasRange, B : HasRange] Range::merge_range(u : A, v : B) -> Range {
     s1 : Interval,
     r1 : ArrayView[Interval],
     s2 : Interval,
-    r2 : ArrayView[Interval]
+    r2 : ArrayView[Interval],
   ) -> Array[Interval] {
     let r1 = r1.to_array()
-    let i = r1.search_by(fn(s) { not(s.end < s2.start) }).or(r1.length())
-    let (r1_left, r1_right) = r1.split_at(i)
+    let i = r1.search_by(fn(s) { not(s.end < s2.start) }).unwrap_or(r1.length())
+    let (r1_left, r1_right) = (r1[:i], r1[i:])
     let z = [s1]
     z.append(r1_left)
     z.append(merge(r1_right, r2))
@@ -147,15 +147,15 @@ pub fn[A : HasRange, B : HasRange] Range::merge_range(u : A, v : B) -> Range {
     s1 : Interval,
     r1 : ArrayView[Interval],
     s2 : Interval,
-    r2 : ArrayView[Interval]
+    r2 : ArrayView[Interval],
   ) -> Array[Interval] {
     let r1 = r1.to_array()
-    let i = r1.search_by(fn(s) { not(s.end <= s2.end) }).or(r1.length())
+    let i = r1.search_by(fn(s) { not(s.end <= s2.end) }).unwrap_or(r1.length())
     merge(r1[:i], [s1.merge(s2), ..r2])
   }
   and merge = fn(
     is1 : ArrayView[Interval],
-    is2 : ArrayView[Interval]
+    is2 : ArrayView[Interval],
   ) -> Array[Interval] {
     match (is1, is1, is2, is2) {
       ([], _, _, _) => is2.to_array()
@@ -199,7 +199,7 @@ pub fn[A : HasRange, B : HasRange] Range::merge_range(u : A, v : B) -> Range {
 pub fn[A : HasRange, B : HasRange, C : HasRange] Range::merge_range3(
   x1 : A,
   x2 : B,
-  x3 : C
+  x3 : C,
 ) -> Range {
   Range::merge_range(
     Range::merge_range(x1.get_range(), x2.get_range()),
@@ -212,7 +212,7 @@ pub fn[A : HasRange, B : HasRange, C : HasRange, D : HasRange] Range::merge_rang
   x1 : A,
   x2 : B,
   x3 : C,
-  x4 : D
+  x4 : D,
 ) -> Range {
   Range::merge_range(
     Range::merge_range3(x1.get_range(), x2.get_range(), x3.get_range()),
@@ -226,7 +226,7 @@ pub fn[A : HasRange, B : HasRange, C : HasRange, D : HasRange, E : HasRange] Ran
   x2 : B,
   x3 : C,
   x4 : D,
-  x5 : E
+  x5 : E,
 ) -> Range {
   Range::merge_range(
     Range::merge_range4(

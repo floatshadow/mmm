@@ -1,23 +1,23 @@
 ///|
-typealias @abstract.MetaVar
+using @abstract {type MetaVar}
 
 ///|
-typealias @syntax.Hiding
+using @syntax {type Hiding}
 
 ///|
-typealias @syntax.Name
+using @syntax {type Name}
 
 ///|
-typealias @abstract.Clause
+using @abstract {type Clause}
 
 ///|
-typealias @abstract.Telescope
+using @abstract {type Telescope}
 
 ///|
-typealias Array[(Value, Hiding)] as Spine
+type Spine = Array[(Value, Hiding)]
 
 ///|
-typealias ArrayView[(Value, Hiding)] as SpineView
+type SpineView = ArrayView[(Value, Hiding)]
 
 ///|
 pub fn extend_spine(spine : Spine, nf : Value, imp : Hiding) -> Spine {
@@ -27,10 +27,7 @@ pub fn extend_spine(spine : Spine, nf : Value, imp : Hiding) -> Spine {
 }
 
 ///|
-typealias Value as TypeVal
-
-///|
-typealias @immut/list.T[(String, Value)] as VEnv
+type VEnv = @immut/list.T[(String, Value)]
 
 ///|
 pub struct ConstantDef {
@@ -54,9 +51,10 @@ pub struct ConDef {
 } derive(Show)
 
 ///|
-typealias @immut/hashmap.T as Map
+type Map[K, V] = @immut_hashmap.HashMap[K, V]
 
-///| Signature Σ
+///|
+/// Signature Σ
 pub struct Sig {
   constants : Map[String, ConstantDef]
   datas : Map[String, DataDef]
@@ -66,9 +64,9 @@ pub struct Sig {
 ///|
 pub fn Sig::new() -> Sig {
   Sig::{
-    constants: @immut/hashmap.new(),
-    datas: @immut/hashmap.new(),
-    cons: @immut/hashmap.new(),
+    constants: @immut_hashmap.new(),
+    datas: @immut_hashmap.new(),
+    cons: @immut_hashmap.new(),
   }
 }
 
@@ -84,6 +82,7 @@ pub enum Neutral {
 } derive(Show)
 
 ///|
+#alias(TypeVal)
 pub enum Value {
   VNe(Neutral) // neutral
   VSet(Int) // universe

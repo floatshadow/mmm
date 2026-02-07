@@ -1,7 +1,7 @@
 ///|
-typealias @util.List2
+using @util {type List2}
 
-///| 
+///|
 fn raw_application(exprs : List1[Expr]) -> Expr {
   match exprs {
     Cons(e, Nil) => e
@@ -14,7 +14,7 @@ fn raw_application(exprs : List1[Expr]) -> Expr {
 fn funclause_or_typesig(
   raw_lhs : Expr,
   mrhs : Either[Expr, Type],
-  wh : WhereClause
+  wh : WhereClause,
 ) -> Declaration {
   let lhs = match raw_lhs.to_pattern() {
     Some(lhs) => lhs

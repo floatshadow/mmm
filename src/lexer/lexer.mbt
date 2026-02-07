@@ -1,20 +1,22 @@
 ///|
-typealias @hashmap.T[String, Keyword] as MutMap
+type MutMap = @hashmap.HashMap[String, Keyword]
 
 ///|
-typealias @queue.T as Queue
+using @queue {type Queue}
 
 ///|
-typealias @util.List1
+using @util {type List1}
 
 ///|
-typealias @util.Loc
+using @util {type Loc}
 
 ///|
-typealias @util.Interval
+using @util {type Interval}
 
 ///|
-priv suberror InvalidCharcode (Int, Loc)
+priv suberror InvalidCharcode {
+  InvalidCharcode((Int, Loc))
+}
 
 ///|
 pub struct Lexer {
@@ -40,7 +42,7 @@ pub enum Keyword {
 } derive(Hash, Eq, Show)
 
 ///|
-typealias @parser.Token
+using @parser {type Token}
 
 /// See https://github.com/agda/agda/blob/master/src/full/Agda/Syntax/Parser/Layout.hs
 /// to allow stacking of layout keywords on the same line.
@@ -96,7 +98,7 @@ fn Lexer::get_loc(self : Lexer) -> Loc {
 
 ///|
 fn Lexer::make_span(self : Lexer, start : Loc) -> String {
-  self.buffer.substring(start=start.index, end=self.index)
+  self.buffer.unsafe_substring(start=start.index, end=self.index)
 }
 
 ///|
@@ -116,7 +118,7 @@ fn Lexer::is_keyword(s : String) -> Keyword? {
 
 ///|
 fn Lexer::ch(self : Lexer) -> Char raise InvalidCharcode {
-  let charcode = self.buffer.charcode_at(self.index)
+  let charcode = self.buffer.code_unit_at(self.index).to_int()
   match Int::to_char(charcode) {
     Some(c) => c
     None => raise InvalidCharcode((charcode, self.get_loc()))
@@ -125,7 +127,7 @@ fn Lexer::ch(self : Lexer) -> Char raise InvalidCharcode {
 
 ///|
 fn Lexer::ch_at(self : Lexer, i : Int) -> Char raise InvalidCharcode {
-  let charcode = self.buffer.charcode_at(self.index + i)
+  let charcode = self.buffer.code_unit_at(self.index + i).to_int()
   match Int::to_char(charcode) {
     Some(c) => c
     None => raise InvalidCharcode((charcode, self.get_loc()))
@@ -135,7 +137,7 @@ fn Lexer::ch_at(self : Lexer, i : Int) -> Char raise InvalidCharcode {
 ///|
 fn Lexer::numeric_literal(
   self : Lexer,
-  begin : Loc
+  begin : Loc,
 ) -> (Token, Interval) raise InvalidCharcode {
   let start = self.index
   self.index += 1
@@ -148,20 +150,20 @@ fn Lexer::numeric_literal(
   }
   try {
     let value = @strconv.parse_int(
-      self.buffer.substring(start~, end=self.index),
+      self.buffer.unsafe_substring(start~, end=self.index),
     )
     let end = self.get_loc()
     let interval = Interval::new(begin, end)
     (Token::IntLiteral((interval, value)), interval)
   } catch {
-    StrConvError(msg) => Lexer::make_error(begin, msg)
+    @strconv.StrConvError(msg) => Lexer::make_error(begin, msg)
   }
 }
 
 ///|
 fn Lexer::ident(
   self : Lexer,
-  begin : Loc
+  begin : Loc,
 ) -> (Token, Interval) raise InvalidCharcode {
   while true {
     let cond = (self.ch() >= 'a' && self.ch() <= 'z') ||
@@ -194,7 +196,7 @@ fn Lexer::ident(
 
 ///|
 fn Lexer::command(
-  self : Lexer
+  self : Lexer,
 ) -> Array[Array[(Token, Interval)]] raise InvalidCharcode {
   let res = []
   let cmd = []
@@ -262,7 +264,7 @@ fn Lexer::skip_comment(self : Lexer) -> Unit raise InvalidCharcode {
 fn Lexer::operator(
   self : Lexer,
   loc : Loc,
-  first_c : Char
+  first_c : Char,
 ) -> (Token, Interval) raise InvalidCharcode {
   self.index += 1
   match first_c {
@@ -320,7 +322,8 @@ fn Lexer::push_tokens(self : Lexer, toks : Array[(Token, Interval)]) -> Unit {
   }
 }
 
-///| Following Python, leading whitespace (spaces and tabs) at the beginning 
+///|
+/// Following Python, leading whitespace (spaces and tabs) at the beginning 
 /// of a logical line is used to compute the indentation level of the line. 
 fn Lexer::indent_level(self : Lexer, loc : Loc) -> Int? raise InvalidCharcode {
   if loc.column != 1 {

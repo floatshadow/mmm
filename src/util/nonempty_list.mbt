@@ -1,7 +1,8 @@
 ///|
-typealias @immut/list.T as List
+using @immut/list {type T as List}
 
-///| Moonbit core has not transferred List::map to error polymorphic version yet.
+///|
+/// Moonbit core has not transferred List::map to error polymorphic version yet.
 fn[A, B] map_exn(xs : List[A], f : (A) -> B raise?) -> List[B] raise? {
   match xs {
     Nil => Nil
@@ -14,14 +15,16 @@ pub(all) enum List1[A] {
   Cons(A, List[A])
 } derive(Eq)
 
-///| Extract the first element of the non-empty list.
+///|
+/// Extract the first element of the non-empty list.
 pub fn[A] List1::head(self : List1[A]) -> A {
   match self {
     Cons(hd, _) => hd
   }
 }
 
-///| Extract the possibly-empty tail of the non-empty list.
+///|
+/// Extract the possibly-empty tail of the non-empty list.
 pub fn[A] List1::tail(self : List1[A]) -> List[A] {
   match self {
     Cons(_, tl) => tl
@@ -46,7 +49,7 @@ pub fn[A] List1::length(self : List1[A]) -> Int {
 ///|
 pub fn[A, B] List1::map(
   self : List1[A],
-  f : (A) -> B raise?
+  f : (A) -> B raise?,
 ) -> List1[B] raise? {
   match self {
     Cons(hd, tl) => Cons(f(hd), map_exn(tl, f))
@@ -212,7 +215,7 @@ pub(all) enum List2[A] {
 ///|
 pub fn[A, B] List2::map(
   self : List2[A],
-  f : (A) -> B raise?
+  f : (A) -> B raise?,
 ) -> List2[B] raise? {
   match self {
     Cons(a1, a2, tl) => Cons(f(a1), f(a2), map_exn(tl, f))

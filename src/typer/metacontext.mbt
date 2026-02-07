@@ -1,5 +1,5 @@
 ///|
-typealias @hashmap.T as MutMap
+type MutMap[K, V] = @hashmap.HashMap[K, V]
 
 ///|
 pub enum MetaEntry {

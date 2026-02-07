@@ -1,7 +1,8 @@
 ///|
-typealias @immut/list.T as List
+using @immut/list {type T as List}
 
-///| σ : Ren Γ Δ
+///|
+/// σ : Ren Γ Δ
 /// Variable mapping from Γ to Δ in de Bruijn level.
 pub struct Renaming {
   dom : Int
@@ -10,12 +11,14 @@ pub struct Renaming {
   ren : List[Int]
 }
 
-///| ε : Ren Γ ∙
+///|
+/// ε : Ren Γ ∙
 pub fn Renaming::epsilon(dom : Int) -> Renaming {
   Renaming::{ dom, codom: 0, ren: Nil }
 }
 
-///| _,_ : (σ : Ren Γ Δ) → Var Γ (A[σ]) → Ren Γ (Δ, A)
+///|
+/// _,_ : (σ : Ren Γ Δ) → Var Γ (A[σ]) → Ren Γ (Δ, A)
 pub fn Renaming::extend(self : Renaming, lvl : Int) -> Renaming {
   Renaming::{ dom: self.dom, codom: self.codom + 1, ren: self.ren.add(lvl) }
 }
@@ -27,17 +30,20 @@ pub struct Weaken {
   weaken : List[Int]
 }
 
-///| ε    : Sub ∙ ∙
+///|
+/// ε    : Sub ∙ ∙
 pub fn Weaken::epsilon() -> Weaken {
   Weaken::{ dom: 0, codom: 0, weaken: Nil }
 }
 
-///| drop : Sub Γ Δ → Sub (Γ, A) Δ
+///|
+/// drop : Sub Γ Δ → Sub (Γ, A) Δ
 pub fn Weaken::drop(self : Weaken) -> Weaken {
   Weaken::{ dom: self.dom + 1, codom: self.codom, weaken: self.weaken }
 }
 
-///| keep : (σ : Sub Γ Δ) → Sub (Γ, A[σ]) (Δ, A)
+///|
+/// keep : (σ : Sub Γ Δ) → Sub (Γ, A[σ]) (Δ, A)
 pub fn Weaken::keep(self : Weaken) -> Weaken {
   Weaken::{
     dom: self.dom + 1,
@@ -63,7 +69,8 @@ pub fn PartialRenaming::lift(self : PartialRenaming) -> PartialRenaming {
   }
 }
 
-///| inverse : (Γ : Context) → (spine : Subst Δ Γ) → Renaming Γ Δ
+///|
+/// inverse : (Γ : Context) → (spine : Subst Δ Γ) → Renaming Γ Δ
 ///
 /// With pattern condition, the high-order unification problem
 ///   ?α spine =? rhs
@@ -84,18 +91,18 @@ fn inverse(
   env : VEnv,
   sig : Sig,
   gamma : Int,
-  spine : SpineView
+  spine : SpineView,
 ) -> PartialRenaming raise Failure {
   fn go(sp : SpineView) -> (Int, Map[Int, Int]) raise Failure {
     match sp {
-      [] => (0, @immut/hashmap.new())
+      [] => (0, @immut_hashmap.new())
       [.. vs, (v, _)] => {
         let (delta, ren) = go(vs)
         match force_meta(env, sig, v) {
           VNe(NeRigid(lvl, [])) => {
-            let x = lvl.inner()
-            match ren.get(lvl.inner()) {
-              None => (delta + 1, ren.add(lvl.inner(), delta))
+            let x = lvl.0
+            match ren.get(lvl.0) {
+              None => (delta + 1, ren.add(lvl.0, delta))
               Some(_) =>
                 fail(
                   "cannot invert spine \{spine}: variable of de Burijn level \{x} already in renaming",
@@ -119,12 +126,12 @@ fn inverse(
 fn rename(
   mv : MetaVar,
   pren : PartialRenaming,
-  rhs : Value
+  rhs : Value,
 ) -> Expr raise Failure {
   letrec go_spine = fn(
     pren : PartialRenaming,
     hd : Expr,
-    sp : SpineView
+    sp : SpineView,
   ) -> Expr raise Failure {
     match sp {
       [] => hd
@@ -144,7 +151,7 @@ fn rename(
           go_spine(pren, Meta(mv2), spine)
         }
       VNe(NeRigid(lvl, sp)) => {
-        let x = lvl.inner()
+        let x = lvl.0
         match pren.ren.get(x) {
           Some(x) => go_spine(pren, Var(@syntax.lvl2idx(pren.dom, x)), sp)
           None =>
@@ -159,11 +166,11 @@ fn rename(
       VPi(x, h, a, b) => {
         let a = go(pren, a)
         let b = go(pren.lift(), b(VNe(Neutral::vvar(pren.codom))))
-        Pi(TypedBinding((x, h, a)), b)
+        Pi(TypedBinding(x, h, a), b)
       }
       VLam(x, h, t) => {
         let t = go(pren.lift(), t(VNe(Neutral::vvar(pren.codom))))
-        Lam(UntypedBinding((x, h)), t)
+        Lam(UntypedBinding(x, h), t)
       }
     }
   }
@@ -171,7 +178,8 @@ fn rename(
   go(pren, rhs)
 }
 
-///| Γ ⊢ ?α [spine] =? rhs
+///|
+/// Γ ⊢ ?α [spine] =? rhs
 fn Typer::solve(
   self : Typer,
   env : VEnv,
@@ -179,7 +187,7 @@ fn Typer::solve(
   lvl : Int,
   mv : MetaVar,
   spine : Spine,
-  rhs : Value
+  rhs : Value,
 ) -> Unit raise Failure {
   self.tracer.log("\{lvl} ⊢ \{mv} [\{spine}] = \{rhs}")
   let pren = inverse(env, sig, lvl, spine)
@@ -187,7 +195,7 @@ fn Typer::solve(
   let mut lam = rhs
   for delta_lvl, arg in spine.rev().iter2() {
     let (_, h) = arg
-    lam = Lam(UntypedBinding(("x#\{delta_lvl}", h)), lam)
+    lam = Lam(UntypedBinding("x#\{delta_lvl}", h), lam)
   }
   let solution = eval(Nil, sig, lam)
   let mty = match lookup_meta(mv) {
@@ -206,7 +214,7 @@ fn Typer::unify_spine(
   sig : Sig,
   lvl : Int,
   sp1 : SpineView,
-  sp2 : SpineView
+  sp2 : SpineView,
 ) -> Unit raise Failure {
   match (sp1, sp2) {
     ([], []) => ()
@@ -228,7 +236,7 @@ fn Typer::unify(
   sig : Sig,
   lvl : Int,
   v1 : TypeVal,
-  v2 : TypeVal
+  v2 : TypeVal,
 ) -> Unit raise Failure {
   self.tracer.log("unify \{v1} with \{v2} [\{@syntax.DBlvl(lvl)}]")
   let v1 = force_meta(env, sig, v1)
@@ -280,7 +288,7 @@ fn Typer::unify_err(
   sig : Sig,
   lvl : Int,
   v1 : TypeVal,
-  v2 : TypeVal
+  v2 : TypeVal,
 ) -> Unit raise Failure {
   let t1 = readback(env, sig, lvl, v1)
   let t2 = readback(env, sig, lvl, v2)

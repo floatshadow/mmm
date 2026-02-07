@@ -1,7 +1,7 @@
 ///|
-typealias @util.Range
+using @util {type Range}
 
-///| 
+///|
 pub struct Name {
   range : Range
   name : String
@@ -23,12 +23,13 @@ pub fn Name::to_raw_name(self : Name) -> String {
 }
 
 ///|
-pub(all) type DBId Int derive(Eq, Hash)
+pub(all) struct DBId(Int) derive(Eq, Hash)
 
 ///|
-pub(all) type DBlvl Int derive(Eq, Hash)
+pub(all) struct DBlvl(Int) derive(Eq, Hash)
 
-///| Implicit attribute..
+///|
+/// Implicit attribute..
 pub(all) enum Hiding {
   Hiding // {x : A} or f {u}
   NotHiding // (x : A) or f u
@@ -40,47 +41,49 @@ pub(all) enum Bounding {
   Defined
 } derive(Show, Eq)
 
-///| e, (x = e) or {x = e}
-pub(all) type NamedArg[T] (Range, Name?, Hiding, T)
+///|
+/// e, (x = e) or {x = e}
+pub(all) struct NamedArg[T](Range, Name?, Hiding, T)
 
 ///|
 pub fn[A, B] NamedArg::fmap(
   self : NamedArg[A],
-  f : (A) -> B raise
+  f : (A) -> B raise,
 ) -> NamedArg[B] raise {
   match self {
-    NamedArg((r, x, hiding, v)) => NamedArg((r, x, hiding, f(v)))
+    NamedArg(r, x, hiding, v) => NamedArg(r, x, hiding, f(v))
   }
 }
 
 ///|
 pub impl[T : Show] Show for NamedArg[T] with output(self, logger) {
   match self {
-    NamedArg((_, Some(x), Hiding, e)) => {
+    NamedArg(_, Some(x), Hiding, e) => {
       logger.write_string("{\{x} = ")
       Show::output(e, logger)
       logger.write_string("}")
     }
-    NamedArg((_, None, Hiding, e)) => {
+    NamedArg(_, None, Hiding, e) => {
       logger.write_string("{")
       Show::output(e, logger)
       logger.write_string("}")
     }
-    NamedArg((_, Some(x), NotHiding, e)) => {
+    NamedArg(_, Some(x), NotHiding, e) => {
       logger.write_string("\{x} = ")
       Show::output(e, logger)
     }
-    NamedArg((_, None, NotHiding, e)) => Show::output(e, logger)
+    NamedArg(_, None, NotHiding, e) => Show::output(e, logger)
   }
 }
 
 ///|
-pub typealias @immut/hashmap.T[String, String] as NameMap
+pub type NameMap = @immut_hashmap.HashMap[String, String]
 
 ///|
-pub typealias @immut/list.T[String] as NameList
+pub type NameList = @immut/list.T[String]
 
-///| Naive fresh name generator.
+///|
+/// Naive fresh name generator.
 pub fn fresh_name(names : NameList) -> String {
   loop 0 {
     i => {
@@ -100,7 +103,7 @@ pub impl Show for Name with output(self, logger) {
 }
 
 ///|
-pub impl Eq for Name with op_equal(self, other) {
+pub impl Eq for Name with equal(self, other) {
   self.name == other.name
 }
 
@@ -116,15 +119,15 @@ pub impl @util.HasRange for Name with get_range(self) {
 
 ///|
 pub fn lvl2idx(n_free_vars : Int, x : DBlvl) -> DBId {
-  DBId(n_free_vars - x.inner() - 1)
+  DBId(n_free_vars - x.0 - 1)
 }
 
 ///|
 pub impl Show for DBId with output(self, logger) {
-  logger.write_string("#\{self.inner()}")
+  logger.write_string("#\{self.0}")
 }
 
 ///|
 pub impl Show for DBlvl with output(self, logger) {
-  logger.write_string("ℓ\{self.inner()}")
+  logger.write_string("ℓ\{self.0}")
 }

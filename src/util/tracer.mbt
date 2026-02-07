@@ -1,8 +1,8 @@
 ///|
-typealias @hashmap.T[String, T] as MutMap[T]
+type MutMap[T] = @hashmap.HashMap[String, T]
 
 ///|
-typealias @buffer.Buffer
+using @buffer {type Buffer}
 
 ///|
 pub let tracer : Tracer = Tracer::new()
@@ -27,7 +27,7 @@ pub struct SubTracer {
 ///|
 pub fn SubTracer::set_output_to_console(
   self : SubTracer,
-  output_to_console : Bool
+  output_to_console : Bool,
 ) -> Unit {
   self.output_to_console = output_to_console
 }
@@ -35,7 +35,7 @@ pub fn SubTracer::set_output_to_console(
 ///|
 pub fn SubTracer::set_redirect_to_log(
   self : SubTracer,
-  redirect_to_log : Bool
+  redirect_to_log : Bool,
 ) -> Unit {
   self.redirect_to_log = redirect_to_log
 }
@@ -87,7 +87,7 @@ pub fn[T : Show] SubTracer::log(self : SubTracer, msg : T) -> Unit {
 pub fn[T : Show] SubTracer::record(
   self : SubTracer,
   item : String,
-  msg : T
+  msg : T,
 ) -> Unit {
   match self.record_buf.get(item) {
     Some(buf) => {
@@ -107,7 +107,7 @@ pub fn[T : Show] SubTracer::record(
 pub fn[T] SubTracer::abort(self : SubTracer, msg : String) -> T raise {
   self.tracer.done(fn(name, s) { println("// [log::\{name}]\n\{s}") }, fn(
     name,
-    s
+    s,
   ) {
     println("// [record::\{name}]\n\{s}")
   })
@@ -132,7 +132,7 @@ pub fn Tracer::new_subtracer(
   self : Tracer,
   name : String,
   output_to_console : Bool,
-  redirect_to_log : Bool
+  redirect_to_log : Bool,
 ) -> SubTracer {
   let subtracer = SubTracer::{
     name,
@@ -160,7 +160,7 @@ pub fn Tracer::flush(self : Tracer) -> Unit {
 pub fn Tracer::done(
   self : Tracer,
   log : (String, String) -> Unit,
-  record : (String, String) -> Unit raise
+  record : (String, String) -> Unit raise,
 ) -> Unit raise {
   self.flush()
   let log_buf = self.log_buf.to_array()

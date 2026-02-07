@@ -1,9 +1,11 @@
 {
     "import": [
+      { "path": "moonbitlang/core/immut/hashmap", "alias": "immut_hashmap" },
+      "moonbitlang/core/hashmap",
+      "moonbitlang/core/buffer",
       "floatshadow/rowmltt/syntax",
       "floatshadow/rowmltt/syntax/concrete",
       "floatshadow/rowmltt/syntax/abstract",
-      "floatshadow/rowmltt/util",
-      "moonbitlang/yacc/tests/calc_jsoncst_test"
+      "floatshadow/rowmltt/util"
     ]
 }

@@ -17,12 +17,13 @@
 // David Thrane Christiansen (2019)
 
 ///|
-typealias @abstract.Pattern
+using @abstract {type Pattern}
 
 ///|
-typealias @syntax.NameList
+using @syntax {type NameList}
 
-///| match one pattern against a value.
+///|
+/// match one pattern against a value.
 fn match_pat(env : VEnv, pat : Pattern, v : Value) -> VEnv? {
   match (pat, v) {
     (PDot(_), _) => Some(env)
@@ -34,11 +35,12 @@ fn match_pat(env : VEnv, pat : Pattern, v : Value) -> VEnv? {
   }
 }
 
-///| match a list of patterns against a spine.
+///|
+/// match a list of patterns against a spine.
 fn match_pats(
   env : VEnv,
   pats : ArrayView[Pattern],
-  spine : SpineView
+  spine : SpineView,
 ) -> VEnv? {
   match (pats, spine) {
     ([], []) => Some(env)
@@ -53,7 +55,7 @@ fn match_clause(
   env : VEnv,
   sig : Sig,
   clause : Clause,
-  spine : SpineView
+  spine : SpineView,
 ) -> Value? raise Failure {
   let pats = clause.lhs_pats
   let rhs = clause.rhs
@@ -74,7 +76,7 @@ fn match_clauses(
   env : VEnv,
   sig : Sig,
   clauses : Array[Clause],
-  spine : SpineView
+  spine : SpineView,
 ) -> Value? raise Failure {
   fn go(clauses : ArrayView[Clause]) -> Value? raise Failure {
     match clauses {
@@ -90,13 +92,14 @@ fn match_clauses(
   go(clauses)
 }
 
-///| beta/iota-reduction
+///|
+/// beta/iota-reduction
 fn eval_app(
   env : VEnv,
   sig : Sig,
   f : Value,
   v : Value,
-  vh : Hiding
+  vh : Hiding,
 ) -> Value raise Failure {
   match f {
     VLam(_, h, t) => {
@@ -133,7 +136,7 @@ fn eval_app_spine(
   env : VEnv,
   sig : Sig,
   f_val : Value,
-  spine : SpineView
+  spine : SpineView,
 ) -> Value raise Failure {
   let mut head = f_val
   for arg in spine {
@@ -159,7 +162,7 @@ fn eval_app_bds(
   env : VEnv,
   sig : Sig,
   m : Value,
-  bds : List[Bounding]
+  bds : List[Bounding],
 ) -> Value raise Failure {
   match (env, bds) {
     (_, Nil) => m
@@ -183,7 +186,7 @@ fn force_meta(env : VEnv, sig : Sig, value : Value) -> Value raise Failure {
 pub fn eval(env : VEnv, sig : Sig, expr : Expr) -> Value raise Failure {
   match expr {
     Var(ix) =>
-      match env.nth(ix.inner()) {
+      match env.nth(ix.0) {
         Some((_, v)) => v
         None => fail("does not find variable \{ix} in environment \{env}")
       }
@@ -200,7 +203,7 @@ pub fn eval(env : VEnv, sig : Sig, expr : Expr) -> Value raise Failure {
     Con(c) => VNe(Neutral::con(c))
     Meta(mv) => eval_meta(mv)
     Set(i) => VSet(i)
-    Pi(TypedBinding((x, h, a)), b) => {
+    Pi(TypedBinding(x, h, a), b) => {
       let a = eval(env, sig, a)
       fn b_tyval(x_val) -> Value raise Failure {
         eval(env.add((x, x_val)), sig, b)
@@ -208,7 +211,7 @@ pub fn eval(env : VEnv, sig : Sig, expr : Expr) -> Value raise Failure {
 
       VPi(x, h, a, b_tyval)
     }
-    Lam(UntypedBinding((x, h)), t) => {
+    Lam(UntypedBinding(x, h), t) => {
       fn t_val(x_val) -> Value raise Failure {
         eval(env.add((x, x_val)), sig, t)
       }
@@ -233,7 +236,7 @@ fn readback_neutral(
   env : VEnv,
   sig : Sig,
   n_free_vars : Int,
-  ntr : Neutral
+  ntr : Neutral,
 ) -> Expr raise Failure {
   fn readback_spine(head : Expr, spine : Spine) -> Expr raise Failure {
     let mut app = head
@@ -262,7 +265,7 @@ pub fn readback(
   env : VEnv,
   sig : Sig,
   free_vars : Int,
-  value : Value
+  value : Value,
 ) -> Expr raise Failure {
   // println("readback: \{value} in free vars \{free_vars}")
   match force_meta(env, sig, value) {
@@ -273,14 +276,14 @@ pub fn readback(
       // to trigger the normalization of body `t`.
       let x_val = VNe(Neutral::vvar(free_vars))
       Lam(
-        UntypedBinding((x, h)),
+        UntypedBinding(x, h),
         readback(env.add((x, x_val)), sig, free_vars + 1, t(x_val)),
       )
     }
     VPi(x, h, a, b) => {
       let x_val = VNe(Neutral::vvar(free_vars))
       Pi(
-        TypedBinding((x, h, readback(env, sig, free_vars, a))),
+        TypedBinding(x, h, readback(env, sig, free_vars, a)),
         readback(env.add((x, x_val)), sig, free_vars + 1, b(x_val)),
       )
     }

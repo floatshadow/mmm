@@ -1,5 +1,6 @@
 {
   "import": [
+    "moonbitlang/core/list",
     "floatshadow/rowmltt/syntax",
     "floatshadow/rowmltt/syntax/concrete",
     "floatshadow/rowmltt/util"

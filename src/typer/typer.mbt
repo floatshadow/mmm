@@ -1,20 +1,20 @@
 ///|
-typealias @abstract.Expr
+using @abstract {type Expr}
 
 ///|
-typealias @abstract.Type
+using @abstract {type Type}
 
 ///|
-typealias @syntax.Bounding
+using @syntax {type Bounding}
 
 ///|
-typealias @syntax.DBlvl
+using @syntax {type DBlvl}
 
 ///|
-typealias @syntax.NamedArg
+using @syntax {type NamedArg}
 
 ///|
-typealias @util.Range
+using @util {type Range}
 
 ///|
 fn bind_name(x1 : String, x2 : String) -> String {
@@ -43,14 +43,14 @@ pub fn TyCtx::new() -> TyCtx {
 pub fn TyCtx::add_binding_var(
   self : TyCtx,
   name : String,
-  ty~ : TypeVal
+  ty~ : TypeVal,
 ) -> TyCtx {
   let value = VNe(Neutral::vvar(self.lvl()))
   {
     ..self,
     values: self.values.add((name, value)),
     typs: self.typs.add((name, ty)),
-    lvl: DBlvl(self.lvl.inner() + 1),
+    lvl: DBlvl(self.lvl.0 + 1),
     bounds: self.bounds.add(Bounding::Bound),
   }
 }
@@ -64,20 +64,20 @@ pub fn TyCtx::add_definition_var(
   self : TyCtx,
   name : String,
   value : Value,
-  ty~ : TypeVal
+  ty~ : TypeVal,
 ) -> TyCtx {
   {
     ..self,
     values: self.values.add((name, value)),
     typs: self.typs.add((name, ty)),
-    lvl: DBlvl(self.lvl.inner() + 1),
+    lvl: DBlvl(self.lvl.0 + 1),
     bounds: self.bounds.add(Bounding::Defined),
   }
 }
 
 ///|
 pub fn TyCtx::lvl(self : TyCtx) -> Int {
-  self.lvl.inner()
+  self.lvl.0
 }
 
 ///|
@@ -106,17 +106,18 @@ pub fn TyCtx::boundings(self : TyCtx) -> List[Bounding] {
 // The implicit argument insertion is based on section 2.6 of 
 // Elaboration with first-class implicit function types.
 
-///| Insert fresh implicit applications to an expr
+///|
+/// Insert fresh implicit applications to an expr
 /// which is not a implicit lambda.
 ///   insert λ{x}. t  _                ->  λ{x}. t
 ///   insert t        Π {x : A}. B[x]  ->  t {u}
 fn Typer::insert_hiding_app(
   self : Typer,
   ctx : TyCtx,
-  hiding_lam : (Expr, TypeVal)
+  hiding_lam : (Expr, TypeVal),
 ) -> (Expr, TypeVal) raise Failure {
   match hiding_lam {
-    (Lam(UntypedBinding((_, Hiding)), _) as t, ty) => (t, ty)
+    (Lam(UntypedBinding(_, Hiding), _) as t, ty) => (t, ty)
     (t, a) => self.insert_hiding_app_unchecked(ctx, (t, a))
   }
 }
@@ -125,7 +126,7 @@ fn Typer::insert_hiding_app(
 fn Typer::insert_hiding_app_unchecked(
   self : Typer,
   ctx : TyCtx,
-  hiding_lam : (Expr, TypeVal)
+  hiding_lam : (Expr, TypeVal),
 ) -> (Expr, TypeVal) raise Failure {
   fn go(t : Expr, a_val : TypeVal) -> (Expr, TypeVal) raise Failure {
     match force_meta(ctx.values, ctx.sig, a_val) {
@@ -157,7 +158,7 @@ pub fn Typer::new(tracer : @util.SubTracer) -> Typer {
 pub fn Typer::fresh_meta(
   self : Typer,
   tyctx : TyCtx,
-  mty : TypeVal
+  mty : TypeVal,
 ) -> @abstract.Expr {
   let meta = next_meta.val
   next_meta.val += 1
@@ -193,7 +194,7 @@ fn TyCtx::pp_gamma(self : TyCtx) -> String raise Failure {
 fn Typer::check_expr_is_type(
   self : Typer,
   ctx : TyCtx,
-  expr : @concrete.Expr
+  expr : @concrete.Expr,
 ) -> (Expr, Int) raise Failure {
   // match self.infer(ctx, expr) {
   //   (t, VSet(i)) => (t, i)
@@ -208,7 +209,7 @@ pub fn Typer::check(
   self : Typer,
   ctx : TyCtx,
   expr : @concrete.Expr,
-  ty : TypeVal
+  ty : TypeVal,
 ) -> Expr raise Failure {
   let gamma = ctx.pp_gamma()
   let ty_expr = readback(ctx.values, ctx.sig, ctx.lvl(), ty)
@@ -220,11 +221,11 @@ pub fn Typer::check(
     // Γ, x : A  ⊢ t : B[x] ⇝ t'
     // ------------------------------------------
     // Γ  ⊢  λx. t ⇐ (x : A) -> B[x] ⇝ λx. t'
-    (Lam(UntypedBinding((_, x, h1)), t), VPi(_, h2, a, b)) if h1 == h2 => {
+    (Lam(UntypedBinding(_, x, h1), t), VPi(_, h2, a, b)) if h1 == h2 => {
       let x = x.to_raw_name()
       let ctx2 = ctx.add_binding_var(x, ty=a)
       let t = self.check(ctx2, t, b(VNe(Neutral::vvar(ctx.lvl()))))
-      Lam(UntypedBinding((x, h1)), t)
+      Lam(UntypedBinding(x, h1), t)
     }
     // Otherwise if Pi is hiding, insert a new implicit lambda
     // Γ, x : A  ⊢ t : B[x] ⇝ t'
@@ -233,7 +234,7 @@ pub fn Typer::check(
     (t, VPi(x, Hiding, a, b)) => {
       let ctx2 = ctx.add_binding_var(x, ty=a)
       let t = self.check(ctx2, t, b(VNe(Neutral::vvar(ctx.lvl()))))
-      Lam(UntypedBinding((x, Hiding)), t)
+      Lam(UntypedBinding(x, Hiding), t)
     }
     // TODO: currently, our NbE and unification are untyped.
     (Hole(_), a) => self.fresh_meta(ctx, a)
@@ -266,7 +267,7 @@ pub fn Typer::check(
 pub fn Typer::infer(
   self : Typer,
   ctx : TyCtx,
-  expr : @concrete.Expr
+  expr : @concrete.Expr,
 ) -> (Expr, TypeVal) raise Failure {
   let gamma = ctx.pp_gamma()
   self.tracer.log("infer? \{gamma} ⊢ \{expr.to_pretty()}")
@@ -317,16 +318,16 @@ pub fn Typer::infer(
         Cons(e1, e2, es2) =>
           loop (e1, e2, es2) {
             (e1, HiddenArg(r, x, e2), Nil) =>
-              break @concrete.App(NoRange, e1, NamedArg((r, x, Hiding, e2)))
+              break @concrete.App(NoRange, e1, NamedArg(r, x, Hiding, e2))
             (e1, e2, Nil) =>
               break @concrete.App(
                 NoRange,
                 e1,
-                NamedArg((NoRange, None, NotHiding, e2)),
+                NamedArg(NoRange, None, NotHiding, e2),
               )
             (e1, HiddenArg(r, x, e2), Cons(e3, es3)) =>
               continue (
-                  @concrete.App(NoRange, e1, NamedArg((r, x, Hiding, e2))),
+                  @concrete.App(NoRange, e1, NamedArg(r, x, Hiding, e2)),
                   e3,
                   es3,
                 )
@@ -335,7 +336,7 @@ pub fn Typer::infer(
                   @concrete.App(
                     NoRange,
                     e1,
-                    NamedArg((NoRange, None, NotHiding, e2)),
+                    NamedArg(NoRange, None, NotHiding, e2),
                   ),
                   e3,
                   es3,
@@ -347,18 +348,18 @@ pub fn Typer::infer(
     App(_, t, u) => {
       let (t, t_tyval, u, h) : (Expr, TypeVal, @concrete.Expr, Hiding) = match
         u {
-        NamedArg((_, None, Hiding, u)) => {
+        NamedArg(_, None, Hiding, u) => {
           let (t, t_tyval) = self.infer(ctx, t)
           (t, t_tyval, u, Hiding)
         }
-        NamedArg((_, None, NotHiding, u)) => {
+        NamedArg(_, None, NotHiding, u) => {
           let (t, t_tyval) = self.insert_hiding_app_unchecked(
             ctx,
             self.infer(ctx, t),
           )
           (t, t_tyval, u, NotHiding)
         }
-        NamedArg((r, Some(x), _, _)) =>
+        NamedArg(r, Some(x), _, _) =>
           fail("at \{r}, do not named hidden argument \{x}")
       }
 
@@ -395,7 +396,7 @@ pub fn Typer::infer(
     }
     HiddenArg(r, _, _) =>
       fail("at \{r}, hidden argument should not be inferred individually!")
-    Lam(UntypedBinding((_, x, h)), t) => {
+    Lam(UntypedBinding(_, x, h), t) => {
       // \ x : ?a .t
       // TODO: In presence of a universe hierarchy, we should
       // insert a fresh level metavariable ?l with ?a : Set(?l)
@@ -409,19 +410,19 @@ pub fn Typer::infer(
         eval(ctx2.values, ctx2.sig, b)
       }
 
-      (Lam(UntypedBinding((x, h)), t), VPi(x, h, a, b_tyval))
+      (Lam(UntypedBinding(x, h), t), VPi(x, h, a, b_tyval))
     }
     // Γ ⊢ A ⇒ Set (i)  Γ, x : A ⊢ B[x] ⇒ Set j
     // -----------------------------------------
     // Γ ⊢ Π (x : A). B[x] ⇒ Set (max(i, j))
-    Pi(TypedBinding((_, x, h, a)), b) => {
+    Pi(TypedBinding(_, x, h, a), b) => {
       let x = x.to_raw_name()
       let (a, a_univ) = self.check_expr_is_type(ctx, a)
       let a_val = eval(ctx.values, ctx.sig, a)
       let ctx2 = ctx.add_binding_var(x, ty=a_val)
       let (b, b_univ) = self.check_expr_is_type(ctx2, b)
       // TODO : temporarily rollback to type in type
-      (Pi(TypedBinding((x, h, a)), b), VSet(0))
+      (Pi(TypedBinding(x, h, a), b), VSet(0))
     }
     Hole(_) => {
       // insert ?t : ?a
@@ -455,7 +456,7 @@ fn TyCtx::add_con(
   self : TyCtx,
   name : String,
   data_name : String,
-  ty : TypeVal
+  ty : TypeVal,
 ) -> TyCtx {
   let con = ConDef::{ name, data_name, ty }
   { ..self, sig: { ..self.sig, cons: self.sig.cons.add(name, con) } }
@@ -466,7 +467,7 @@ fn TyCtx::add_funclause(
   self : TyCtx,
   head : String,
   pats : Array[Pattern],
-  rhs : Expr
+  rhs : Expr,
 ) -> TyCtx raise Failure {
   // function clauses are not checked here, but in the elaboration phase
   let clause = Clause::{ lhs_head: head, lhs_pats: pats, rhs }
@@ -501,7 +502,7 @@ fn Typer::axiom_check(
   self : Typer,
   ctx : TyCtx,
   name : Name,
-  ty : @concrete.Expr
+  ty : @concrete.Expr,
 ) -> TyCtx raise Failure {
   let name = name.to_raw_name()
   let (ty, _) = self.check_expr_is_type(ctx, ty)
@@ -514,17 +515,18 @@ fn Typer::axiom_check(
   ctx.add_axiom(name, tyval)
 }
 
-///| Checking the telescope
+///|
+/// Checking the telescope
 fn Typer::check_telescope(
   self : Typer,
   ctx : TyCtx,
-  telescope : @concrete.Telescope
+  telescope : @concrete.Telescope,
 ) -> (TyCtx, Array[(String, TypeVal, Int)]) raise Failure {
   let mut ctx2 = ctx
   let binds = []
   for bind in telescope {
     match bind {
-      TypedBinding((_, x, _, a)) => {
+      TypedBinding(_, x, _, a) => {
         let x = x.to_raw_name()
         let (a, a_univ) = self.check_expr_is_type(ctx, a)
         let a_val = eval(ctx.values, ctx.sig, a)
@@ -574,7 +576,7 @@ fn Typer::check_funclause(
   ctx : TyCtx,
   lhs : @concrete.Pattern,
   rhs : @concrete.Expr,
-  whs : @concrete.WhereClause
+  whs : @concrete.WhereClause,
 ) -> TyCtx raise Failure {
   // function clauses are not checked here, but in the elaboration phase
   let (lhs_head, lhs_pats) = match lhs {
@@ -606,7 +608,7 @@ fn Typer::check_postulate(
   self : Typer,
   ctx : TyCtx,
   kwr : @util.Range,
-  ds : Array[@concrete.Declaration]
+  ds : Array[@concrete.Declaration],
 ) -> TyCtx raise Failure {
   let mut ctx2 = ctx
   for d in ds {
@@ -629,7 +631,7 @@ fn Typer::check_postulate(
 fn Typer::check_declarations(
   self : Typer,
   ctx : TyCtx,
-  decls : Array[@concrete.Declaration]
+  decls : Array[@concrete.Declaration],
 ) -> Unit raise Failure {
   let mut ctx2 = ctx
   for decl in decls {
@@ -650,7 +652,7 @@ fn Typer::check_declarations(
 ///|
 pub fn Typer::check_program(
   self : Typer,
-  program : Array[@concrete.Declaration]
+  program : Array[@concrete.Declaration],
 ) -> Unit raise Failure {
   let ctx = TyCtx::new()
   self.check_declarations(ctx, program)
@@ -671,10 +673,10 @@ pub fn alpha_equiv(e1 : Expr, e2 : Expr) -> Bool {
   match (e1, e2) {
     (Var(i1), Var(i2)) => i1 == i2
     (Set(u1), Set(u2)) => u1 == u2
-    (Pi(TypedBinding((_, h1, a1)), b1), Pi(TypedBinding((_, h2, a2)), b2)) if h1 ==
+    (Pi(TypedBinding(_, h1, a1), b1), Pi(TypedBinding(_, h2, a2), b2)) if h1 ==
       h2 => alpha_equiv(a1, a2) && alpha_equiv(b1, b2)
-    (Lam(UntypedBinding((_, h1)), t1), Lam(UntypedBinding((_, h2)), t2)) if h1 ==
-      h2 => alpha_equiv(t1, t2)
+    (Lam(UntypedBinding(_, h1), t1), Lam(UntypedBinding(_, h2), t2)) if h1 == h2 =>
+      alpha_equiv(t1, t2)
     (App(f1, a1, h1), App(f2, a2, h2)) if h1 == h2 =>
       alpha_equiv(f1, f2) && alpha_equiv(a1, a2)
     _ => false

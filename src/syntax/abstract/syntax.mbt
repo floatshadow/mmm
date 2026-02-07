@@ -1,28 +1,30 @@
 ///|
-typealias @syntax.Hiding
+using @syntax {type Hiding}
 
 ///|
-typealias @syntax.Bounding
+using @syntax {type Bounding}
 
 ///|
-typealias @syntax.DBId
+using @syntax {type DBId}
 
 ///|
-typealias @immut/list.T as List
+using @immut/list {type T as List}
 
 ///|
-pub(all) type TypedBinding (String, Hiding, Type)
+pub(all) struct TypedBinding(String, Hiding, Type)
 
 ///|
-pub(all) type UntypedBinding (String, Hiding)
-
-///| (x : A) (y : B) (z : C) ... 
-pub typealias Array[TypedBinding] as Telescope
+pub(all) struct UntypedBinding(String, Hiding)
 
 ///|
-pub(all) type MetaVar Int derive(Eq, Hash)
+/// (x : A) (y : B) (z : C) ... 
+pub type Telescope = Array[TypedBinding]
 
 ///|
+pub(all) struct MetaVar(Int) derive(Eq, Hash)
+
+///|
+#alias(Type)
 pub(all) enum Expr {
   Var(DBId) // de Burijn index #1
   Def(String) // f
@@ -37,23 +39,23 @@ pub(all) enum Expr {
 }
 
 ///|
-pub typealias Expr as Type
-
-///| p  ::=  x | c ps | .(e)
+/// p  ::=  x | c ps | .(e)
 pub(all) enum Pattern {
   PVar(String)
   PCon(String, Array[Pattern])
   PDot(Expr) // inaccessible pattern
 }
 
-///| k  ::=  f ps = e
+///|
+/// k  ::=  f ps = e
 pub(all) struct Clause {
   lhs_head : String
   lhs_pats : Array[Pattern]
   rhs : Expr
 }
 
-///| Top level declarations.
+///|
+/// Top level declarations.
 pub(all) enum Declaration {
   Axiom(String, Type) // f : A
   Mutual(Array[Declaration]) // mutual definition
@@ -92,7 +94,7 @@ pub fn Expr::telescope_pi(telescope : Telescope, codomain : Type) -> Type {
 
 ///|
 pub impl Show for MetaVar with output(self, logger) {
-  logger.write_string("?m\{self.inner()}")
+  logger.write_string("?m\{self.0}")
 }
 
 ///|
@@ -103,7 +105,7 @@ pub fn MetaVar::to_string(self : MetaVar) -> String {
 ///|
 pub impl Show for TypedBinding with output(self, logger) {
   match self {
-    TypedBinding((name, imp, ty)) =>
+    TypedBinding(name, imp, ty) =>
       match imp {
         Hiding => {
           logger.write_string("{\{name} : ")
@@ -122,7 +124,7 @@ pub impl Show for TypedBinding with output(self, logger) {
 ///|
 pub impl Show for UntypedBinding with output(self, logger) {
   match self {
-    UntypedBinding((name, imp)) =>
+    UntypedBinding(name, imp) =>
       match imp {
         Hiding => logger.write_string("{\{name}}")
         NotHiding => logger.write_string("\{name}")
@@ -148,7 +150,7 @@ pub fn Expr::to_pretty(self : Expr) -> PrettyExpr {
 ///|
 fn PrettyExpr::print_one_level(
   logger : @util.IndentLogger,
-  syntax : Expr
+  syntax : Expr,
 ) -> Unit {
   match syntax {
     Var(i) => logger.write_string("\{i}")
@@ -266,7 +268,7 @@ pub fn Declaration::to_pretty(self : Declaration) -> PrettyDecl {
 ///|
 fn PrettyDecl::print_one_level(
   logger : @util.IndentLogger,
-  decl : Declaration
+  decl : Declaration,
 ) -> Unit {
   match decl {
     Postulate(ds) => {
