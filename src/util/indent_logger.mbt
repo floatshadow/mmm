@@ -27,13 +27,11 @@ pub fn IndentLogger::outdent(self : IndentLogger) -> Unit {
   self.indent -= 1
 }
 
-///|
-pub impl Logger for IndentLogger with write_substring(
-  self : IndentLogger,
-  s : String,
-  start : Int,
-  len : Int,
-) -> Unit {
+pub impl Logger for IndentLogger with write_view(self : IndentLogger, s : StringView) -> Unit {
+  let start = s.start_offset()
+  let len = s.length()
+  let s = s.data()
+
   // Find the next newline character
   let mut start = start
   let mut curr = start
@@ -44,7 +42,7 @@ pub impl Logger for IndentLogger with write_substring(
       self.line_start = false
     }
     if s.code_unit_at(curr) == '\n' {
-      self.logger.write_substring(s, start, curr - start)
+      self.logger.write_view(try! s[start : curr-start])
       self.logger.write_char('\n')
       self.line_start = true
       start = curr + 1
@@ -55,7 +53,7 @@ pub impl Logger for IndentLogger with write_substring(
     self.print_indent()
     self.line_start = false
   }
-  self.logger.write_substring(s, start, end - start)
+  self.logger.write_view(try! s[start : end - start])
 }
 
 ///|
@@ -77,5 +75,5 @@ pub impl Logger for IndentLogger with write_string(
   self : IndentLogger,
   s : String,
 ) -> Unit {
-  Logger::write_substring(self, s, 0, s.length())
+  Logger::write_view(self, s)
 }
