@@ -1,4 +1,3 @@
-
 ///|
 /// Moonbit core has not transferred List::map to error polymorphic version yet.
 fn[A, B] map_exn(xs : List[A], f : (A) -> B raise?) -> List[B] raise? {

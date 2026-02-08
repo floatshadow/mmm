@@ -27,7 +27,11 @@ pub fn IndentLogger::outdent(self : IndentLogger) -> Unit {
   self.indent -= 1
 }
 
-pub impl Logger for IndentLogger with write_view(self : IndentLogger, s : StringView) -> Unit {
+///|
+pub impl Logger for IndentLogger with write_view(
+  self : IndentLogger,
+  s : StringView,
+) -> Unit {
   let start = s.start_offset()
   let len = s.length()
   let s = s.data()
@@ -42,7 +46,7 @@ pub impl Logger for IndentLogger with write_view(self : IndentLogger, s : String
       self.line_start = false
     }
     if s.code_unit_at(curr) == '\n' {
-      self.logger.write_view(try! s[start : curr-start])
+      self.logger.write_view(try! s[start:curr - start])
       self.logger.write_char('\n')
       self.line_start = true
       start = curr + 1
@@ -53,7 +57,7 @@ pub impl Logger for IndentLogger with write_view(self : IndentLogger, s : String
     self.print_indent()
     self.line_start = false
   }
-  self.logger.write_view(try! s[start : end - start])
+  self.logger.write_view(try! s[start:end - start])
 }
 
 ///|

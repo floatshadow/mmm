@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+///|
 pub(all) enum List[A] {
-  Nil 
+  Nil
   Cons(A, List[A])
 } derive(Eq)
 
@@ -24,9 +25,8 @@ pub fn[A] List::add(self : List[A], head : A) -> List[A] {
 
 ///|
 pub impl[A : Show] Show for List[A] with output(xs, logger) {
-  logger.write_iter(xs.iter(), prefix="from_array([", suffix="])")
+  logger.write_iter(xs.iter(), prefix="@list.of([", suffix="])")
 }
-
 
 ///|
 pub impl[A : ToJson] ToJson for List[A] with to_json(self) {
@@ -149,10 +149,7 @@ pub fn[A] List::eachi(
 ///
 /// ```mbt check
 /// test {
-///   assert_eq(
-///     of([1, 2, 3, 4, 5]).map(x => x * 2),
-///     of([2, 4, 6, 8, 10]),
-///   )
+///   assert_eq(of([1, 2, 3, 4, 5]).map(x => x * 2), of([2, 4, 6, 8, 10]))
 /// }
 /// ```
 pub fn[A, B] List::map(self : List[A], f : (A) -> B) -> List[B] {
@@ -186,10 +183,7 @@ pub fn[A, B] List::mapi(
 /// # Example
 /// ```mbt check
 /// test {
-///   assert_eq(
-///     of([1, 2, 3, 4, 5]).rev_map(x => x * 2),
-///     of([10, 8, 6, 4, 2]),
-///   )
+///   assert_eq(of([1, 2, 3, 4, 5]).rev_map(x => x * 2), of([10, 8, 6, 4, 2]))
 /// }
 /// ```
 pub fn[A, B] List::rev_map(
@@ -572,10 +566,7 @@ pub fn[A, B] List::fold_righti(
 /// ```mbt check
 /// test {
 ///   let r = of([1, 2, 3, 4, 5]).zip(of([6, 7, 8, 9, 10]))
-///   assert_eq(
-///     r,
-///     Some(from_array([(1, 6), (2, 7), (3, 8), (4, 9), (5, 10)])),
-///   )
+///   assert_eq(r, Some(from_array([(1, 6), (2, 7), (3, 8), (4, 9), (5, 10)])))
 /// }
 /// ```
 pub fn[A, B] List::zip(self : List[A], other : List[B]) -> List[(A, B)]? {
@@ -1092,13 +1083,11 @@ pub fn[A] List::find(self : List[A], f : (A) -> Bool raise?) -> A? raise? {
 /// ```mbt check
 /// test {
 ///   assert_eq(
-///     of([1, 3, 5, 8]).findi((element, index) => element % 2 == 0 &&
-///       index == 3),
+///     of([1, 3, 5, 8]).findi((element, index) => element % 2 == 0 && index == 3),
 ///     Some(8),
 ///   )
 ///   assert_eq(
-///     of([1, 3, 8, 5]).findi((element, index) => element % 2 == 0 &&
-///       index == 3),
+///     of([1, 3, 8, 5]).findi((element, index) => element % 2 == 0 && index == 3),
 ///     None,
 ///   )
 /// }
@@ -1202,11 +1191,7 @@ pub fn[A : Eq] List::is_suffix(self : List[A], suffix : List[A]) -> Bool {
 /// # Example
 /// ```mbt check
 /// test {
-///   let ls = of([
-///     of([1, 2, 3]),
-///     of([4, 5, 6]),
-///     of([7, 8, 9]),
-///   ])
+///   let ls = of([of([1, 2, 3]), of([4, 5, 6]), of([7, 8, 9])])
 ///   let r = ls.intercalate(of([0]))
 ///   assert_eq(r, of([1, 2, 3, 0, 4, 5, 6, 0, 7, 8, 9]))
 /// }

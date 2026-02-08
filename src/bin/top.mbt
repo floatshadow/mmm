@@ -19,6 +19,9 @@ let tracer : @util.Tracer = @util.tracer
 ///|
 fn main {
   let argv = @sys.get_cli_args()
+  if argv.length() == 1 {
+    argv.push("--help")
+  }
   // *.wasm [args...]
   let truncated_argv = argv[1:].to_array()
   @ArgParser.parse(
@@ -58,6 +61,8 @@ fn main {
     "",
     truncated_argv,
   ) catch {
+    @ArgParser.ErrorMsg(help_msg) =>
+      println("please run with one filename and \{help_msg}")
     _ as err => println("\{err}")
   }
   let file = match opts.file {
