@@ -80,7 +80,7 @@ pub impl[T : Show] Show for NamedArg[T] with output(self, logger) {
 pub type NameMap = @immut_hashmap.HashMap[String, String]
 
 ///|
-pub type NameList = @immut/list.T[String]
+pub type NameList = @util.List[String]
 
 ///|
 /// Naive fresh name generator.

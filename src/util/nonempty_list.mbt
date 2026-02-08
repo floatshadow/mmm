@@ -1,5 +1,3 @@
-///|
-using @immut/list {type T as List}
 
 ///|
 /// Moonbit core has not transferred List::map to error polymorphic version yet.

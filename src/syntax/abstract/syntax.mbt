@@ -8,7 +8,7 @@ using @syntax {type Bounding}
 using @syntax {type DBId}
 
 ///|
-using @immut/list {type T as List}
+using @util {type List}
 
 ///|
 pub(all) struct TypedBinding(String, Hiding, Type)

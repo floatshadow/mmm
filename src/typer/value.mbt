@@ -27,7 +27,7 @@ pub fn extend_spine(spine : Spine, nf : Value, imp : Hiding) -> Spine {
 }
 
 ///|
-type VEnv = @immut/list.T[(String, Value)]
+type VEnv = @util.List[(String, Value)]
 
 ///|
 pub struct ConstantDef {

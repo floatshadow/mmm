@@ -1,5 +1,7 @@
 {
   "import": [
+    "moonbitlang/core/json",
+    "moonbitlang/core/quickcheck",
     "moonbitlang/core/buffer",
     "moonbitlang/core/hashmap"
   ]

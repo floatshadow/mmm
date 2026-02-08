@@ -1,5 +1,5 @@
 ///|
-using @immut/list {type T as List}
+using @util {type List}
 
 ///|
 /// σ : Ren Γ Δ

@@ -1,12 +1,13 @@
 {
+  "warn-list": "-01-02-03-09",
   "name": "floatshadow/rowmltt",
   "version": "0.1.0",
   "deps": {
-    "Yoorkin/ArgParser": "0.1.9",
-    "moonbitlang/x": "0.4.30"
+    "Yoorkin/ArgParser": "0.2.0",
+    "moonbitlang/x": "0.4.38"
   },
   "bin-deps": {
-    "moonbitlang/yacc": "0.6.6"
+    "moonbitlang/yacc": "0.7.9"
   },
   "readme": "README.md",
   "license": "GPLv3",
